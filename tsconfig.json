@@ -1,0 +1,52 @@
+{
+  "include": [
+    "src/**/*",
+    "types/**/*",
+    "webpack.server.compiler.ts",
+    "webpack.config.ts",
+    "webpack.build.compiler.ts"
+  ],
+  "compilerOptions": {
+    // 决定如何处理模块
+    "moduleResolution": "Bundler",
+    // 指定生成哪个模块系统代码
+    "module": "preserve",
+    "declaration": false,
+    // 指定查找基本目录
+    "baseUrl": "./",
+    // 模块名到基于 baseUrl的路径映射的列表
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    // 解析 JSON 模块
+    "resolveJsonModule": true,
+    // 	当 this表达式的值为 any类型的时候，生成一个错误。
+    "noImplicitThis": true,
+    // 启用所有严格类型检查选项。
+    "strict": true,
+    // 区分import 和 import type
+    "verbatimModuleSyntax": true,
+    // 指定ECMAScript目标版本 
+    "target": "ESNext",
+    // 禁止对同一个文件的不一致的引用。
+    "forceConsistentCasingInFileNames": true,
+    // 忽略所有的声明文件（ *.d.ts）的类型检查。
+    "skipLibCheck": true,
+    // 生成源映射文件（可选）  
+    "sourceMap": true,
+    // 生成的 JavaScript 文件的输出目录（可选）  
+    "outDir": "dist"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      // 决定如何处理模块（ts-node只支持commonjs规范）
+      "moduleResolution": "NodeNext",
+      // 指定生成哪个模块系统代码（ts-node只支持commonjs规范）
+      "module": "NodeNext",
+      // 区分import 和 import type
+      "verbatimModuleSyntax": false,
+    }
+  }
+}

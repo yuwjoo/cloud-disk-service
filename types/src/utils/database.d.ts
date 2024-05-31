@@ -1,0 +1,46 @@
+export interface UsersTable {
+  account: string; // 账号
+  password: string; // 密码
+  nickname: string; // 昵称
+  avatar: string | null; // 头像
+  status: 'active' | 'disabled'; // 状态，active: 激活；disabled: 禁用
+  role_code: string; // 角色code
+  root_directory_id: number; // 根目录id
+} // 用户表
+
+export interface RolesTable {
+  code: string; // 角色code
+  name: string; // 角色名称
+} // 角色表
+
+export interface LoginRecordsTable {
+  account: string; // 关联账号
+  token: string; // 关联token
+  token_created_date: string; // token的创建日期
+  token_expires_date: string; // token的过期日期
+} // 登录记录表
+
+export interface ResourcesTable {
+  id: number; // id
+  object: string; // oss object
+  size: number; // 大小
+  type: string; // 类型
+  hash: string; // hash值
+  reference_count: number; // 被引用计数
+  create_date: string; // 创建日期
+  modified_date: string; // 修改日期
+} // 资源表
+
+export interface DirectorysTable {
+  id: number; // id
+  name: string; // 名称
+  size: number; // 大小
+  type: string; // 类型
+  resources_id: number | null; // 关联的资源id
+  parent_id: number | null; // 父级目录id
+  create_account: string; // 创建人账号
+  create_date: string; // 创建日期
+  modified_date: string; // 修改日期
+} // 目录表
+
+export {};
