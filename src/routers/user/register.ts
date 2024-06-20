@@ -20,7 +20,6 @@ async function register(
   req: RouteRequest<RegisterRequestBody>,
   res: RouteResponse<RegisterResponseData>
 ) {
-  console.log('进入注册');
   const { body } = req;
 
   if (!body || !body.account || !body.password) {

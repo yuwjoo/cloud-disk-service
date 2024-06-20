@@ -42,7 +42,7 @@ async function verifyCallback(
   const sign_str = await getSignStr(req); // 待签名字符串
 
   req.body = queryStrToObject(req.body as unknown as string) as UploadCallbackRequestBody;
-  req.headers['Authorization'] = req.body.token;
+  req.headers['authorization'] = req.body.token;
 
   if (
     verifySignature(publickKey, signature, sign_str) &&
@@ -65,8 +65,6 @@ async function uploadCallback(
   req: RouteRequest<UploadCallbackRequestBody>,
   res: RouteResponse<UploadCallbackResponseData>
 ) {
-  console.log(req.body);
-
   const { lastInsertRowid } = useDatabase()
     .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash'>>(
       `INSERT INTO resources (object, size, type, hash) VALUES ($object, $size, $type, $hash)`
@@ -116,7 +114,7 @@ async function uploadCallback(
       }); // 插入文件数据
     useDatabase()
       .prepare<Pick<ResourcesTable, 'id'>>(
-        `UPDATE resources SET reference_count=1, modified_date=datetime (CURRENT_TIMESTAMP, 'localtime') WHERE id = $id;`
+        `UPDATE resources SET reference_count = reference_count + 1, modified_date = datetime (CURRENT_TIMESTAMP, 'localtime') WHERE id = $id;`
       )
       .run({ id: lastInsertRowid as number }); // 更新资源引用计数
   })();

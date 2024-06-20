@@ -8,7 +8,6 @@ import type { NextFunction } from 'express';
  * @param {NextFunction} next 通过函数
  */
 export async function cors(req: RouteRequest, res: RouteResponse, next: NextFunction) {
-  console.log('进入', req.method.toLowerCase());
   //设置允许跨域的域名，*代表允许任意域名跨域
   res.header('Access-Control-Allow-Origin', '*');
   //允许的header类型

@@ -16,7 +16,6 @@ export function useDatabase(): BetterSqlite3.Database {
 
   try {
     const dbExists = fs.existsSync(useConfig().databasePath);
-    console.log(dbExists, useConfig().databasePath);
     db = new Database(useConfig().databasePath, {
       verbose: console.log, // 显示所有查询日志（可选）
       fileMustExist: false, // 如果数据库文件不存在，则抛出错误（可选）
