@@ -66,14 +66,15 @@ async function uploadCallback(
   res: RouteResponse<UploadCallbackResponseData>
 ) {
   const { lastInsertRowid } = useDatabase()
-    .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash'>>(
-      `INSERT INTO resources (object, size, type, hash) VALUES ($object, $size, $type, $hash)`
+    .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash' | 'create_account'>>(
+      `INSERT INTO resources (object, size, type, hash, create_account) VALUES ($object, $size, $type, $hash, $create_account)`
     )
     .run({
       object: req.body.object,
       size: req.body.size,
       type: req.body.type,
-      hash: req.body.hash
+      hash: req.body.hash,
+      create_account: res.locals.user.account
     }); // 插入资源数据
 
   const currentFolder = useDatabase()

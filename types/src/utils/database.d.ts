@@ -20,6 +20,15 @@ export interface LoginRecordsTable {
   token_expires_date: string; // token的过期日期
 } // 登录记录表
 
+export interface STSRecordsTable {
+  account: string; // 关联账号
+  access_key_id: string; // AccessKeyId
+  access_key_secret: string; // AccessKeySecret
+  security_token: string; // SecurityToken
+  expiration: string; // Expiration
+  upload_path: string; // 上传路径
+} // sts记录表
+
 export interface ResourcesTable {
   id: number; // id
   object: string; // oss object
@@ -27,6 +36,7 @@ export interface ResourcesTable {
   type: string; // 类型
   hash: string; // hash值
   reference_count: number; // 被引用计数
+  create_account: string; // 创建人账号
   create_date: string; // 创建日期
   modified_date: string; // 修改日期
 } // 资源表

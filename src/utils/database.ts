@@ -76,7 +76,7 @@ function initDatabase() {
 
   db.prepare(
     `-- 创建登录记录表
-    CREATE TABLE login_records (
+    CREATE TABLE IF NOT EXISTS login_records (
         -- 关联账号
         account TEXT NOT NULL REFERENCES users (account) ON DELETE CASCADE,
 
@@ -88,6 +88,29 @@ function initDatabase() {
 
         -- token的过期日期
         token_expires_date DATETIME NOT NULL
+    );`
+  ).run();
+
+  db.prepare(
+    `-- 创建STS记录表
+    CREATE TABLE IF NOT EXISTS sts_records (
+        -- 关联账号
+        account TEXT NOT NULL REFERENCES users (account) ON DELETE CASCADE,
+
+        -- AccessKeyId
+        access_key_id TEXT NOT NULL,
+
+        -- AccessKeySecret
+        access_key_secret TEXT NOT NULL,
+
+        -- SecurityToken
+        security_token TEXT NOT NULL,
+
+        -- Expiration
+        expiration TEXT NOT NULL,
+
+        -- 上传路径
+        upload_path TEXT NOT NULL
     );`
   ).run();
 
@@ -111,6 +134,9 @@ function initDatabase() {
     
       -- 被引用计数
       reference_count INTEGER NOT NULL DEFAULT 0,
+    
+      -- 创建人账号
+      create_account TEXT NOT NULL,
     
       -- 创建日期
       create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),
