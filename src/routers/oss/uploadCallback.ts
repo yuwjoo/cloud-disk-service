@@ -33,27 +33,29 @@ async function verifyCallback(
   res: RouteResponse<UploadCallbackResponseData>,
   next: NextFunction
 ) {
-  if (!req.headers['authorization'] || !req.headers['x-oss-pub-key-url']) {
+  let isError: boolean;
+
+  try {
+    const publickKey = await getPublicKey(req); // oss公钥
+    const signature = await getAuthorization(req); // 签名
+    const sign_str = await getSignStr(req); // 待签名字符串
+    const verify = verifySignature(publickKey, signature, sign_str); // 校验签名
+
+    req.body = queryStrToObject(req.body as unknown as string) as UploadCallbackRequestBody;
+    req.headers['authorization'] = req.body.token;
+
+    isError = !verify || req.headers['x-oss-bucket'] !== useConfig().oss.bucketName;
+  } catch (err) {
+    isError = true;
+  }
+
+  if (isError) {
+    // 校验失败
     res.json(defineResponseBody({ code: responseCode.error, msg: '拒绝请求' }));
     return;
   }
-  const publickKey = await getPublicKey(req); // oss公钥
-  const signature = await getAuthorization(req); // 签名
-  const sign_str = await getSignStr(req); // 待签名字符串
 
-  req.body = queryStrToObject(req.body as unknown as string) as UploadCallbackRequestBody;
-  req.headers['authorization'] = req.body.token;
-
-  if (
-    verifySignature(publickKey, signature, sign_str) &&
-    req.body.bucket === useConfig().oss.bucketName
-  ) {
-    // 校验通过
-    next();
-  } else {
-    // 校验失败
-    res.json(defineResponseBody({ code: responseCode.error, msg: '拒绝请求' }));
-  }
+  next();
 }
 
 /**
