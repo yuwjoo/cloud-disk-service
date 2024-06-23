@@ -14,6 +14,7 @@ export interface RouteResponse<Body = any, Locals = RouteResponseLocals>
   extends Response<ResponseBody<Body>, Locals> {} // 路由响应对象
 
 export interface RouteResponseLocals {
+  token: string; // 用户token
   user: UsersTable; // 用户信息
 } // 路由响应对象-本地数据
 

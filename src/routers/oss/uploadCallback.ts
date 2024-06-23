@@ -1,10 +1,11 @@
 import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
-import type { DirectorysTable, ResourcesTable } from 'types/src/utils/database';
+import type { ResourcesTable } from 'types/src/utils/database';
 import type {
   UploadCallbackRequestBody,
   UploadCallbackResponseData
 } from 'types/src/routers/oss/uploadCallback';
 import type { NextFunction } from 'express';
+import type { ResourceFlag } from 'types/src/routers/fileSystem/getResourceFlag';
 import { useDatabase } from '@/utils/database';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { createVerify } from 'crypto';
@@ -12,13 +13,13 @@ import { base64ToString, queryStrToObject } from '@/utils/utils';
 import http from 'http';
 import https from 'https';
 import { useConfig } from '@/utils/config';
-import { authorization } from '@/middlewares/authorization';
+import { encrypt } from '@/utils/secure';
 
 let cachePublicKey: string; // 缓存的oss公钥
 
 export default defineRoute({
   method: 'post',
-  handler: [verifyCallback, authorization, uploadCallback],
+  handler: [verifyCallback, uploadCallback],
   options: { authorization: false, requestBody: 'text' }
 });
 
@@ -42,7 +43,6 @@ async function verifyCallback(
     const verify = verifySignature(publickKey, signature, sign_str); // 校验签名
 
     req.body = queryStrToObject(req.body as unknown as string) as UploadCallbackRequestBody;
-    req.headers['authorization'] = req.body.token;
 
     isError = !verify || req.headers['x-oss-bucket'] !== useConfig().oss.bucketName;
   } catch (err) {
@@ -65,64 +65,23 @@ async function verifyCallback(
  */
 async function uploadCallback(
   req: RouteRequest<UploadCallbackRequestBody>,
-  res: RouteResponse<UploadCallbackResponseData>
+  res: RouteResponse<UploadCallbackResponseData, any>
 ) {
   const { lastInsertRowid } = useDatabase()
-    .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash' | 'create_account'>>(
-      `INSERT INTO resources (object, size, type, hash, create_account) VALUES ($object, $size, $type, $hash, $create_account)`
+    .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash'>>(
+      `INSERT INTO resources (object, size, type, hash) VALUES ($object, $size, $type, $hash)`
     )
     .run({
       object: req.body.object,
       size: req.body.size,
       type: req.body.type,
-      hash: req.body.hash,
-      create_account: res.locals.user.account
+      hash: req.body.hash
     }); // 插入资源数据
 
-  const currentFolder = useDatabase()
-    .prepare<Pick<DirectorysTable, 'id' | 'create_account'>, Pick<DirectorysTable, 'id'>>(
-      `SELECT id FROM directorys WHERE id = $id AND create_account = $create_account`
-    )
-    .get({
-      id: req.body.folderId || res.locals.user.root_directory_id,
-      create_account: res.locals.user.account
-    }); // 查询当前文件夹
+  const flag: ResourceFlag = { token: req.body.token, resourceId: lastInsertRowid as number };
+  const flagText = encrypt(JSON.stringify(flag));
 
-  if (!currentFolder) {
-    // 无法访问
-    res.json(defineResponseBody({ code: responseCode.error, msg: '无法访问该文件夹' }));
-    return;
-  }
-
-  useDatabase().transaction(() => {
-    useDatabase()
-      .prepare<
-        Pick<
-          DirectorysTable,
-          'name' | 'size' | 'type' | 'resources_id' | 'parent_id' | 'create_account'
-        >
-      >(
-        `INSERT INTO directorys
-          (name, size, type, resources_id, parent_id, create_account)
-      VALUES
-          ($name, $size, $type, $resources_id, $parent_id, $create_account)`
-      )
-      .run({
-        name: req.body.name,
-        size: req.body.size,
-        type: req.body.type,
-        resources_id: lastInsertRowid as number,
-        parent_id: currentFolder.id,
-        create_account: res.locals.user.account
-      }); // 插入文件数据
-    useDatabase()
-      .prepare<Pick<ResourcesTable, 'id'>>(
-        `UPDATE resources SET reference_count = reference_count + 1, modified_date = datetime (CURRENT_TIMESTAMP, 'localtime') WHERE id = $id;`
-      )
-      .run({ id: lastInsertRowid as number }); // 更新资源引用计数
-  })();
-
-  res.json(defineResponseBody({ msg: '上传成功' }));
+  res.json(defineResponseBody({ data: { resourceFlag: flagText }, msg: '上传成功' }));
 }
 
 /**

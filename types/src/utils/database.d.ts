@@ -36,7 +36,6 @@ export interface ResourcesTable {
   type: string; // 类型
   hash: string; // hash值
   reference_count: number; // 被引用计数
-  create_account: string; // 创建人账号
   create_date: string; // 创建日期
   modified_date: string; // 修改日期
 } // 资源表

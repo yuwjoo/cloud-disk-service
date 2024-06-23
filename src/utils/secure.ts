@@ -4,6 +4,33 @@ import jwt from 'jsonwebtoken';
 import { useConfig } from './config';
 import { base64ToString } from './utils';
 
+const secretKey = Buffer.from(useConfig().secretKeyBase64, 'base64');
+const iv = Buffer.from(useConfig().ivBase64, 'base64');
+
+/**
+ * @description: 对称加密
+ * @param {string} text 文本
+ * @return {string} 加密文本
+ */
+export function encrypt(text: string): string {
+  const cipher = crypto.createCipheriv('aes-256-cbc', secretKey, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return encrypted;
+}
+
+/**
+ * @description: 对称解密
+ * @param {string} encryptedText 加密文本
+ * @return {string} 文本
+ */
+export function decrypt(encryptedText: string): string {
+  let decipher = crypto.createDecipheriv('aes-256-cbc', secretKey, iv);
+  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
 /**
  * @description: 生成RSA密钥对
  * @return {crypto.KeyPairSyncResult<string, string>} 生成给密钥对
@@ -19,7 +46,7 @@ export function generateKey(): crypto.KeyPairSyncResult<string, string> {
       type: 'pkcs8',
       format: 'pem',
       cipher: 'aes-256-cbc',
-      passphrase: useConfig().salt
+      passphrase: useConfig().secretKeyBase64
     }
   });
 }
@@ -52,7 +79,7 @@ export function privateDecrypt(encrypted: string): string {
       key: base64ToString(useConfig().privateKeyBase64),
       padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       oaepHash: 'sha256',
-      passphrase: useConfig().salt
+      passphrase: useConfig().secretKeyBase64
     },
     Buffer.from(encrypted, 'base64')
   );
@@ -65,7 +92,7 @@ export function privateDecrypt(encrypted: string): string {
  * @return {string} hash值
  */
 export function createHash(data: string): string {
-  return crypto.createHmac('sha256', useConfig().salt).update(data).digest('hex');
+  return crypto.createHmac('sha256', useConfig().secretKeyBase64).update(data).digest('hex');
 }
 
 /**
@@ -74,7 +101,7 @@ export function createHash(data: string): string {
  * @return {string} token
  */
 export function createUserToken(data: JwtUserParams, options?: jwt.SignOptions): string {
-  return jwt.sign(data, useConfig().salt, options);
+  return jwt.sign(data, useConfig().secretKeyBase64, options);
 }
 
 /**
@@ -83,5 +110,5 @@ export function createUserToken(data: JwtUserParams, options?: jwt.SignOptions):
  * @return {JwtUserPayload} token信息
  */
 export function verifyUserToken(token: string): JwtUserPayload {
-  return jwt.verify(token, useConfig().salt) as JwtUserPayload;
+  return jwt.verify(token, useConfig().secretKeyBase64) as JwtUserPayload;
 }

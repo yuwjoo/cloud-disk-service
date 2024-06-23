@@ -135,9 +135,6 @@ function initDatabase() {
       -- 被引用计数
       reference_count INTEGER NOT NULL DEFAULT 0,
     
-      -- 创建人账号
-      create_account TEXT NOT NULL,
-    
       -- 创建日期
       create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),
     

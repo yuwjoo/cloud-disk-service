@@ -44,7 +44,7 @@ export async function authorization(req: RouteRequest, res: RouteResponse, next:
     return;
   }
 
-  res.locals = { user: userData };
+  res.locals = { token, user: userData };
 
   next();
 }

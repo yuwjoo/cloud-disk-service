@@ -44,7 +44,7 @@ async function sts(_req: RouteRequest<any, StsRequestQuery>, res: RouteResponse<
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const date = now.getDate();
-  const uploadPath = `storage/${account}/${year}/${month}/${date}`;
+  const uploadPath = `storage/${account}/${year}-${month}-${date}/${now.getHours()}H${now.getMinutes()}M${now.getSeconds()}S`;
   const policy = {
     Version: '1',
     Statement: [
