@@ -1,10 +1,10 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { DirectorysTable, ResourcesTable } from 'types/src/utils/database';
 import type {
+  CreateFileRequestBody,
   CreateFileRequestQuery,
-  CreateFileResponseData
+  CreateFileResponseBody
 } from 'types/src/routers/fileSystem/createFile';
-import type { ResourceFlag } from 'types/src/routers/fileSystem/getResourceFlag';
+import type { ResourceFlagPayload } from 'types/src/routers/fileSystem/getResourceFlag';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import { decrypt } from '@/utils/secure';
@@ -16,12 +16,12 @@ export default defineRoute({
 
 /**
  * @description: 创建文件接口
- * @param {Request} req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} req 请求
+ * @param {RouteResponse} res 响应
  */
 async function createFile(
-  req: RouteRequest<any, CreateFileRequestQuery>,
-  res: RouteResponse<CreateFileResponseData>
+  req: RouteRequest<CreateFileRequestBody, CreateFileRequestQuery>,
+  res: RouteResponse<CreateFileResponseBody>
 ) {
   if (!req.query.fileName || !req.query.resourceFlag) {
     res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
@@ -40,7 +40,7 @@ async function createFile(
     return;
   }
 
-  let resourceFlagData: ResourceFlag; // 资源标识数据
+  let resourceFlagData: ResourceFlagPayload; // 资源标识数据
   let isFlagExpire: boolean; // 标识已失效
 
   try {

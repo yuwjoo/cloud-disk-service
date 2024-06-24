@@ -1,4 +1,3 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { NextFunction } from 'express';
 
 /**

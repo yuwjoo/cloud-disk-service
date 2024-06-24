@@ -1,8 +1,8 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { UsersTable } from 'types/src/utils/database';
 import type {
   ResetPasswordRequestBody,
-  ResetPasswordResponseData
+  ResetPasswordRequestQuery,
+  ResetPasswordResponseBody
 } from 'types/src/routers/user/resetPassword';
 import { useDatabase } from '@/utils/database';
 import { createHash } from '@/utils/secure';
@@ -16,12 +16,12 @@ export default defineRoute({
 
 /**
  * @description: 重置密码接口
- * @param {Request} req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} req 请求
+ * @param {RouteResponse} res 响应
  */
 async function resetPassword(
-  req: RouteRequest<ResetPasswordRequestBody>,
-  res: RouteResponse<ResetPasswordResponseData>
+  req: RouteRequest<ResetPasswordRequestBody, ResetPasswordRequestQuery>,
+  res: RouteResponse<ResetPasswordResponseBody>
 ) {
   const { body } = req;
 

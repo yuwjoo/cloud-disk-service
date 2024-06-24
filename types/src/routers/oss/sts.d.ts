@@ -1,11 +1,14 @@
-export type StsRequestQuery = void; // 请求参数
+// sts接口-请求body
+export type STSRequestBody = void;
 
-export type StsResponseData = {
+// sts接口-请求query
+export type STSRequestQuery = void;
+
+// sts接口-响应body
+export type STSResponseBody = ResponseBody<{
   AccessKeyId: string; // AccessKeyId
   AccessKeySecret: string; // AccessKeySecret
   SecurityToken: string; // SecurityToken
   Expiration: string; // 过期时间
   uploadPath: string; // 上传路径
-}; // 响应数据
-
-export {};
+}>;

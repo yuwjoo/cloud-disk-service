@@ -6,6 +6,8 @@ import { base64ToString } from './utils';
 
 const secretKey = Buffer.from(useConfig().secretKeyBase64, 'base64');
 const iv = Buffer.from(useConfig().ivBase64, 'base64');
+const publicKey = base64ToString(useConfig().publicKeyBase64);
+const privateKey = base64ToString(useConfig().privateKeyBase64);
 
 /**
  * @description: 对称加密
@@ -59,7 +61,7 @@ export function generateKey(): crypto.KeyPairSyncResult<string, string> {
 export function publicEncrypt(data: string): string {
   const encrypted = crypto.publicEncrypt(
     {
-      key: base64ToString(useConfig().publicKeyBase64),
+      key: publicKey,
       padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       oaepHash: 'sha256'
     },
@@ -76,7 +78,7 @@ export function publicEncrypt(data: string): string {
 export function privateDecrypt(encrypted: string): string {
   const decrypted = crypto.privateDecrypt(
     {
-      key: base64ToString(useConfig().privateKeyBase64),
+      key: privateKey,
       padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       oaepHash: 'sha256',
       passphrase: useConfig().secretKeyBase64

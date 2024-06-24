@@ -1,6 +1,5 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { STSRecordsTable } from 'types/src/utils/database';
-import type { StsRequestQuery, StsResponseData } from 'types/src/routers/oss/sts';
+import type { STSRequestBody, STSRequestQuery, STSResponseBody } from 'types/src/routers/oss/sts';
 import { useConfig } from '@/utils/config';
 import { useSTS } from '@/utils/oss';
 import { defineResponseBody, defineRoute } from '@/utils/router';
@@ -13,10 +12,13 @@ export default defineRoute({
 
 /**
  * @description: sts临时访问凭证接口
- * @param {Request} _req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} _req 请求
+ * @param {RouteResponse} res 响应
  */
-async function sts(_req: RouteRequest<any, StsRequestQuery>, res: RouteResponse<StsResponseData>) {
+async function sts(
+  _req: RouteRequest<STSRequestBody, STSRequestQuery>,
+  res: RouteResponse<STSResponseBody>
+) {
   const historySTS = useDatabase()
     .prepare<STSRecordsTable['account'], STSRecordsTable>(
       `SELECT * FROM sts_records WHERE account = ?`

@@ -1,6 +1,9 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { DirectorysTable, UsersTable } from 'types/src/utils/database';
-import type { RegisterRequestBody, RegisterResponseData } from 'types/src/routers/user/register';
+import type {
+  RegisterRequestBody,
+  RegisterRequestQuery,
+  RegisterResponseBody
+} from 'types/src/routers/user/register';
 import { useDatabase } from '@/utils/database';
 import { createHash } from '@/utils/secure';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
@@ -13,12 +16,12 @@ export default defineRoute({
 
 /**
  * @description: 注册接口
- * @param {Request} req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} req 请求
+ * @param {RouteResponse} res 响应
  */
 async function register(
-  req: RouteRequest<RegisterRequestBody>,
-  res: RouteResponse<RegisterResponseData>
+  req: RouteRequest<RegisterRequestBody, RegisterRequestQuery>,
+  res: RouteResponse<RegisterResponseBody>
 ) {
   const { body } = req;
 

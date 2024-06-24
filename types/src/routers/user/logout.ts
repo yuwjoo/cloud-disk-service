@@ -1,5 +1,8 @@
-export type LogoutRequestQuery = void; // 请求参数
+// 登出接口-请求body
+export type LogoutRequestBody = void;
 
-export type LogoutResponseData = void; // 响应数据
+// 登出接口-请求query
+export type LogoutRequestQuery = void;
 
-export {};
+// 登出接口-响应body
+export type LogoutResponseBody = ResponseBody<void>;

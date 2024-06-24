@@ -1,11 +1,11 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { ResourcesTable } from 'types/src/utils/database';
 import type {
   UploadCallbackRequestBody,
-  UploadCallbackResponseData
+  UploadCallbackRequestQuery,
+  UploadCallbackResponseBody
 } from 'types/src/routers/oss/uploadCallback';
 import type { NextFunction } from 'express';
-import type { ResourceFlag } from 'types/src/routers/fileSystem/getResourceFlag';
+import type { ResourceFlagPayload } from 'types/src/routers/fileSystem/getResourceFlag';
 import { useDatabase } from '@/utils/database';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { createVerify } from 'crypto';
@@ -30,8 +30,8 @@ export default defineRoute({
  * @param {NextFunction} next 通过函数
  */
 async function verifyCallback(
-  req: RouteRequest<string | UploadCallbackRequestBody>,
-  res: RouteResponse<UploadCallbackResponseData>,
+  req: RouteRequest<string | UploadCallbackRequestBody, UploadCallbackRequestQuery>,
+  res: RouteResponse<UploadCallbackResponseBody>,
   next: NextFunction
 ) {
   let isError: boolean;
@@ -60,12 +60,12 @@ async function verifyCallback(
 
 /**
  * @description: 上传回调接口
- * @param {Request} req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} req 请求
+ * @param {RouteResponse} res 响应
  */
 async function uploadCallback(
-  req: RouteRequest<UploadCallbackRequestBody>,
-  res: RouteResponse<UploadCallbackResponseData, any>
+  req: RouteRequest<UploadCallbackRequestBody, UploadCallbackRequestQuery, any>,
+  res: RouteResponse<UploadCallbackResponseBody>
 ) {
   const { lastInsertRowid } = useDatabase()
     .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash'>>(
@@ -78,7 +78,10 @@ async function uploadCallback(
       hash: req.body.hash
     }); // 插入资源数据
 
-  const flag: ResourceFlag = { token: req.body.token, resourceId: lastInsertRowid as number };
+  const flag: ResourceFlagPayload = {
+    token: req.body.token,
+    resourceId: lastInsertRowid as number
+  };
   const flagText = encrypt(JSON.stringify(flag));
 
   res.json(defineResponseBody({ data: { resourceFlag: flagText }, msg: '上传成功' }));

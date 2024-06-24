@@ -3,9 +3,7 @@ import type {
   DefineRouteReturn,
   DefineRouteConfig,
   DefineResponseBodyOptions,
-  defineResponseBodyReturn,
-  RouteRequest,
-  RouteResponse
+  defineResponseBodyReturn
 } from 'types/src/utils/router';
 import { authorization } from '@/middlewares/authorization';
 import { error } from './log';
@@ -42,26 +40,29 @@ export function defineResponseBody<T = any>(
  * @return {DefineRouteReturn} 路由数据
  */
 export function defineRoute(config: DefineRouteConfig): DefineRouteReturn {
-  const defaultOptions = { authorization: true, disabled: false, requestBody: 'json' };
-  const handlers = [];
-
-  for (let handler of Array.isArray(config.handler) ? config.handler : [config.handler]) {
-    handlers.push(async (req: RouteRequest, res: RouteResponse, next: NextFunction) => {
-      try {
-        await handler(req, res, next);
-      } catch (err) {
-        error('API名称: ', req.url);
-        error('API报错: ', err);
-        res.json(defineResponseBody({ code: responseCode.serverError, msg: '服务器内部错误' }));
-      }
-    });
-  }
-
-  return {
-    method: config.method,
-    handlers,
-    options: Object.assign(defaultOptions, config.options)
+  const options = Object.assign(
+    {
+      authorization: true,
+      disabled: false,
+      bodyParser: config.method === 'post' ? 'json' : undefined
+    },
+    config.options
+  );
+  const handler = async (
+    req: RouteRequest,
+    res: RouteResponse<ResponseBody>,
+    next: NextFunction
+  ) => {
+    try {
+      await config.handler(req, res, next);
+    } catch (err) {
+      error('API名称: ', req.url);
+      error('API报错: ', err);
+      res.json(defineResponseBody({ code: responseCode.serverError, msg: '服务器内部错误' }));
+    }
   };
+
+  return { method: config.method, options, middlewares: config.middlewares || [], handler };
 }
 
 /**
@@ -73,34 +74,30 @@ export function loadRouter(app: Express) {
     const routers: __WebpackModuleApi.RequireContext = require.context('@/routers', true, /\.ts$/); // 获取所有路由模块
 
     for (let key of routers.keys()) {
-      const { method, handlers, options } = routers(key).default as DefineRouteReturn;
+      const { method, middlewares, handler, options } = routers(key).default as DefineRouteReturn;
       const routePath: string = '/' + (key.match(/^\.[\/\\](.+)\.ts$/)?.[1] || '');
-      const middlewares: any[] = [];
+      let beforeMiddlewares: any = [];
 
-      if (options.disabled) {
-        continue;
-      }
+      if (options.disabled) continue;
 
-      if (options.authorization) {
-        middlewares.push(authorization);
-      }
+      if (options.authorization) beforeMiddlewares.push(authorization);
 
-      switch (options.requestBody) {
+      switch (options.bodyParser) {
         case 'json':
-          middlewares.push(express.json()); // 处理json数据
+          beforeMiddlewares.push(express.json()); // 处理json数据
           break;
         case 'urlencoded':
-          middlewares.push(express.urlencoded({ extended: true })); // 处理表单数据
+          beforeMiddlewares.push(express.urlencoded({ extended: true })); // 处理表单数据
           break;
         case 'text':
-          middlewares.push(express.text({ type: '*/*' })); // 处理文本数据
+          beforeMiddlewares.push(express.text({ type: '*/*' })); // 处理文本数据
           break;
         case 'raw':
-          middlewares.push(express.raw({ type: '*/*' })); // 处理buffer数据
+          beforeMiddlewares.push(express.raw({ type: '*/*' })); // 处理buffer数据
           break;
       }
 
-      app[method](routePath, ...middlewares, ...handlers);
+      app[method](routePath, ...beforeMiddlewares, ...middlewares, handler);
     }
   } catch (err) {
     error('路由加载出错：' + (err as Error).stack);

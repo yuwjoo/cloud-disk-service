@@ -1,8 +1,8 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { DirectorysTable } from 'types/src/utils/database';
 import type {
+  GetDirectoryListRequestBody,
   GetDirectoryListRequestQuery,
-  GetDirectoryListResponseData
+  GetDirectoryListResponseBody
 } from 'types/src/routers/fileSystem/getDirectoryList';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
@@ -14,12 +14,12 @@ export default defineRoute({
 
 /**
  * @description: 获取目录列表接口
- * @param {Request} req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} req 请求
+ * @param {RouteResponse} res 响应
  */
 async function getDirectoryList(
-  req: RouteRequest<any, GetDirectoryListRequestQuery>,
-  res: RouteResponse<GetDirectoryListResponseData>
+  req: RouteRequest<GetDirectoryListRequestBody, GetDirectoryListRequestQuery>,
+  res: RouteResponse<GetDirectoryListResponseBody>
 ) {
   const folderId = req.query.folderId || res.locals.user.root_directory_id;
   const folder = useDatabase()

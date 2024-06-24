@@ -1,3 +1,4 @@
+// oss上传回调接口-请求body
 export type UploadCallbackRequestBody = {
   token: string; // token
   object: string; // oss object
@@ -5,10 +6,12 @@ export type UploadCallbackRequestBody = {
   size: number; // 文件大小
   type: string; // 文件类型
   hash: string; // 文件hash
-}; // 请求body
+};
 
-export type UploadCallbackResponseData = {
+// oss上传回调接口-请求query
+export type UploadCallbackRequestQuery = void;
+
+// oss上传回调接口-响应body
+export type UploadCallbackResponseBody = ResponseBody<{
   resourceFlag: string; // 资源标识
-}; // 响应数据
-
-export {};
+}>;

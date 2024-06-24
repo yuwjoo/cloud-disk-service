@@ -1,8 +1,8 @@
-import type { RouteRequest, RouteResponse } from 'types/src/utils/router';
 import type { DirectorysTable, ResourcesTable } from 'types/src/utils/database';
 import type {
+  DownloadFileRequestBody,
   DownloadFileRequestQuery,
-  DownloadFileResponseData
+  DownloadFileResponseBody
 } from 'types/src/routers/fileSystem/downloadFile';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
@@ -15,12 +15,12 @@ export default defineRoute({
 
 /**
  * @description: 下载文件接口
- * @param {Request} req 请求
- * @param {Response} res 响应
+ * @param {RouteRequest} req 请求
+ * @param {RouteResponse} res 响应
  */
 async function downloadFile(
-  req: RouteRequest<any, DownloadFileRequestQuery>,
-  res: RouteResponse<DownloadFileResponseData>
+  req: RouteRequest<DownloadFileRequestBody, DownloadFileRequestQuery>,
+  res: RouteResponse<DownloadFileResponseBody>
 ) {
   if (!req.query.fileId) {
     res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
