@@ -12,7 +12,8 @@ import { defineResponseBody } from '@/utils/router';
  * @param {NextFunction} next 通过函数
  */
 export async function authorization(req: RouteRequest, res: RouteResponse, next: NextFunction) {
-  const token: string | undefined = req.headers['authorization'] as string;
+  const token = req.headers['authorization'];
+
   if (!token) {
     // token未携带
     res.json(defineResponseBody({ code: responseCode.reLogin, msg: '当前还未登录' }));

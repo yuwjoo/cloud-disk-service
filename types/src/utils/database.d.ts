@@ -3,9 +3,11 @@ export interface UsersTable {
   password: string; // 密码
   nickname: string; // 昵称
   avatar: string | null; // 头像
-  status: 'active' | 'disabled'; // 状态，active: 激活；disabled: 禁用
+  status: 'enable' | 'disabled'; // enable: 启用；disabled: 禁用
   role_code: string; // 角色code
-  root_directory_id: number; // 根目录id
+  root_folder_path: string; // 根文件夹路径
+  create_date: string; // 创建日期
+  modified_date: string; // 修改日期
 } // 用户表
 
 export interface RolesTable {
@@ -33,7 +35,7 @@ export interface ResourcesTable {
   id: number; // id
   object: string; // oss object
   size: number; // 大小
-  type: string; // 类型
+  mime_type: string | null; // MIME类型
   hash: string; // hash值
   reference_count: number; // 被引用计数
   create_date: string; // 创建日期
@@ -42,11 +44,12 @@ export interface ResourcesTable {
 
 export interface DirectorysTable {
   id: number; // id
+  folder_path: string | null; // 文件夹路径
   name: string; // 名称
   size: number; // 大小
   type: string; // 类型
+  mime_type: string | null; // MIME类型
   resources_id: number | null; // 关联的资源id
-  parent_id: number | null; // 父级目录id
   create_account: string; // 创建人账号
   create_date: string; // 创建日期
   modified_date: string; // 修改日期

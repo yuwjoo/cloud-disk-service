@@ -52,14 +52,20 @@ function initDatabase() {
       -- 头像
       avatar TEXT,
 
-      -- 状态 (active: 激活; disabled: 禁用)
-      status TEXT NOT NULL DEFAULT 'active',
+      -- 状态 (enable: 启用; disabled: 禁用)
+      status TEXT NOT NULL DEFAULT 'enable',
 
       -- 角色code (默认 普通用户: 002)
       role_code TEXT NOT NULL REFERENCES roles (code) DEFAULT '002',
       
-      -- 根目录id
-      root_directory_id INTEGER DEFAULT -1
+      -- 根文件夹路径
+      root_folder_path TEXT,
+      
+      -- 创建日期
+      create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),
+    
+      -- 修改日期
+      modified_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime'))
     );`
   ).run();
 
@@ -126,8 +132,8 @@ function initDatabase() {
       -- 资源大小
       size REAL NOT NULL DEFAULT 0,
 
-      -- 资源类型
-      type TEXT NOT NULL,
+      -- 资源MIME类型
+      mime_type TEXT,
     
       -- hash值
       hash TEXT NOT NULL,
@@ -148,6 +154,9 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS directorys (
       -- id
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+      -- 文件夹路径
+      folder_path TEXT,
     
       -- 名称
       name TEXT NOT NULL,
@@ -157,12 +166,12 @@ function initDatabase() {
 
       -- 类型
       type TEXT NOT NULL,
+
+      -- MIME类型
+      mime_type TEXT,
     
       -- 关联的资源id
       resources_id INTEGER REFERENCES resources(id) ON DELETE SET NULL,
-      
-      -- 父级目录id
-      parent_id INTEGER REFERENCES directorys(id) ON DELETE CASCADE,
     
       -- 创建人账号
       create_account TEXT NOT NULL,
@@ -181,12 +190,12 @@ function initDatabase() {
 
   // 初始化账号数据
   db.prepare(
-    'INSERT OR IGNORE INTO users (account, password, nickname, role_code, root_directory_id) VALUES (?, ?, ?, ?, ?)'
-  ).run(useConfig().admin.account, createHash(useConfig().admin.password), '管理员', '001', 1);
+    'INSERT OR IGNORE INTO users (account, password, nickname, role_code, root_folder_path) VALUES (?, ?, ?, ?, ?)'
+  ).run(useConfig().admin.account, createHash(useConfig().admin.password), '管理员', '001', '/');
 
   // 初始化目录数据
   db.prepare('INSERT OR IGNORE INTO directorys (name, type, create_account) VALUES (?, ?, ?)').run(
-    'storage',
+    '/',
     'folder',
     useConfig().admin.account
   );

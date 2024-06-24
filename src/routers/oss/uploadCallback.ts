@@ -30,7 +30,7 @@ export default defineRoute({
  * @param {NextFunction} next 通过函数
  */
 async function verifyCallback(
-  req: RouteRequest<UploadCallbackRequestBody>,
+  req: RouteRequest<string | UploadCallbackRequestBody>,
   res: RouteResponse<UploadCallbackResponseData>,
   next: NextFunction
 ) {
@@ -42,7 +42,7 @@ async function verifyCallback(
     const sign_str = await getSignStr(req); // 待签名字符串
     const verify = verifySignature(publickKey, signature, sign_str); // 校验签名
 
-    req.body = queryStrToObject(req.body as unknown as string) as UploadCallbackRequestBody;
+    req.body = queryStrToObject(req.body as string) as UploadCallbackRequestBody;
 
     isError = !verify || req.headers['x-oss-bucket'] !== useConfig().oss.bucketName;
   } catch (err) {

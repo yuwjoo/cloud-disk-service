@@ -8,15 +8,18 @@ export interface ResponseBody<T = any> {
   msg: string; // 响应消息
 } // 响应body
 
-export interface RouteRequest<Body = any, Query = any> extends Request<any, any, Body, Query> {} // 路由请求对象
-
-export interface RouteResponse<Body = any, Locals = RouteResponseLocals>
-  extends Response<ResponseBody<Body>, Locals> {} // 路由响应对象
-
-export interface RouteResponseLocals {
+export interface CustomLocals {
   token: string; // 用户token
   user: UsersTable; // 用户信息
-} // 路由响应对象-本地数据
+} // 自定义本地数据
+
+export interface RouteRequest<Body = void, Query = void, Locals = CustomLocals>
+  extends Request<any, any, Body, Query> {
+  locals: Locals;
+} // 路由请求对象
+
+export interface RouteResponse<Body = void, Locals = RouteResponseLocals>
+  extends Response<ResponseBody<Body>, Locals> {} // 路由响应对象
 
 export interface DefineRouteConfig {
   method: DefineRouteConfigMethod;
