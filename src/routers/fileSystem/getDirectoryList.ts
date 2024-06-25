@@ -6,6 +6,7 @@ import type {
 } from 'types/src/routers/fileSystem/getDirectoryList';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
+import { mergePath } from '@/utils/utils';
 
 /**
  * @description: 获取目录列表接口
@@ -18,9 +19,12 @@ export default defineRoute({
   ) => {
     const { query, locals } = req;
 
-    const folderPath = query.folderPath || locals.user.root_folder_path;
+    const folderRow = selectFolder({
+      id: query.folderId,
+      folder_path: locals.user.root_folder_path
+    });
 
-    if (!folderPath.startsWith(locals.user.root_folder_path)) {
+    if (!folderRow || !folderRow.folder_path?.startsWith(locals.user.root_folder_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
       return;
     }
@@ -53,13 +57,29 @@ export default defineRoute({
 });
 
 /**
- * @description: 查询目录
+ * @description: 根据id查询文件夹
  */
-function selectDirectory(params: Pick<DirectorysTable, 'id' | 'folder_path'>) {
+function selectFolderById(params: DirectorysTable['id']): string {
+  type SQLResult = Pick<DirectorysTable, 'folder_path' | 'name'>;
+
+  const sql = `SELECT folder_path, name FROM directorys WHERE type = 'folder' AND id = $id;`;
+  const folderRow = useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
+  return folderRow ? mergePath(folderRow.folder_path || '', folderRow.name) : '';
+}
+
+/**
+ * @description: 根据路径查询文件夹
+ */
+function selectFolderByPath(params: Partial<Pick<DirectorysTable, 'id'> & { path: string }>) {
   type SQLResult = Pick<DirectorysTable, 'folder_path'>;
 
-  const sql = `SELECT folder_path FROM directorys WHERE id = $id OR folder_path = $folder_path;`;
-  return useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
+  if (params.id) {
+    const sql = `SELECT folder_path FROM directorys WHERE type = 'folder' AND id = $id;`;
+    return useDatabase().prepare<typeof params, SQLResult>(sql).get({ id: params.id });
+  } else {
+    const sql = `SELECT folder_path FROM directorys WHERE type = 'folder' AND folder_path = $folder_path AND name = $name;`;
+    return useDatabase().prepare<typeof params, SQLResult>(sql).get({ id: params.id });
+  }
 }
 
 /**

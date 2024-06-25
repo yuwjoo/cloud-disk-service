@@ -44,3 +44,31 @@ export function base64ToString(base64: string): string {
   if (!base64) '';
   return Buffer.from(base64, 'base64').toString();
 }
+
+/**
+ * @description: 拆分路径
+ * @param {string} path 路径
+ * @return {{ parent: string, folder: string }} 路径数据
+ */
+export function splitPath(path: string): { parent: string; folder: string } {
+  const clipPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  const lastIndex = clipPath.lastIndexOf('/');
+  const parent = clipPath.slice(0, lastIndex + 1);
+  const folder = clipPath.slice(lastIndex + 1) + '/';
+
+  return { parent, folder };
+}
+
+/**
+ * @description: 合并路径
+ * @param {string} parent 父级路径
+ * @param {string} folder 文件夹
+ * @return {string} 路径
+ */
+export function mergePath(parent: string, folder: string): string {
+  const clipParent = parent.endsWith('/') ? parent : parent + '/';
+  const clipFolder = folder.endsWith('/') ? folder : folder + '/';
+  const path = clipParent + clipFolder;
+
+  return path.trim() === '//' ? '/' : path;
+}
