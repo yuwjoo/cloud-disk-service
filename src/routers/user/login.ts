@@ -34,10 +34,10 @@ export default defineRoute({
       res.json(defineResponseBody({ code: responseCode.error, msg: '账号状态异常，无法登录' }));
       return;
     }
+
     const roleRow = selectRole({ code: userRow.role_code });
     const timeKey = useConfig()[body.temporary ? 'tempTokenExpirationTime' : 'tokenExpirationTime'];
     const token = createUserToken({ account: userRow.account }, { expiresIn: timeKey }); // 生成token
-
     insertLoginRecord({
       account: userRow.account,
       token: token,

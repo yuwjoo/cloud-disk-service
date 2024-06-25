@@ -17,10 +17,33 @@ import { encrypt } from '@/utils/secure';
 
 let cachePublicKey: string; // 缓存的oss公钥
 
+/**
+ * @description: 上传回调接口
+ */
 export default defineRoute({
   method: 'post',
-  handler: [verifyCallback, uploadCallback],
-  options: { authorization: false, requestBody: 'text' }
+  options: { authorization: false, bodyParser: 'text' },
+  middlewares: [verifyCallback],
+  handler: async (
+    req: RouteRequest<UploadCallbackRequestBody, UploadCallbackRequestQuery, void>,
+    res: RouteResponse<UploadCallbackResponseBody>
+  ) => {
+    const { body } = req;
+    const { lastInsertRowid } = insertResource({
+      object: body.object,
+      size: body.size,
+      mime_type: body.mimetype || null,
+      hash: body.hash
+    });
+    const flag: ResourceFlagPayload = {
+      token: body.token,
+      resourceId: lastInsertRowid as number
+    };
+
+    res.json(
+      defineResponseBody({ data: { resourceFlag: encrypt(JSON.stringify(flag)) }, msg: '上传成功' })
+    );
+  }
 });
 
 /**
@@ -30,7 +53,7 @@ export default defineRoute({
  * @param {NextFunction} next 通过函数
  */
 async function verifyCallback(
-  req: RouteRequest<string | UploadCallbackRequestBody, UploadCallbackRequestQuery>,
+  req: RouteRequest<string, UploadCallbackRequestQuery, void>,
   res: RouteResponse<UploadCallbackResponseBody>,
   next: NextFunction
 ) {
@@ -41,8 +64,6 @@ async function verifyCallback(
     const signature = await getAuthorization(req); // 签名
     const sign_str = await getSignStr(req); // 待签名字符串
     const verify = verifySignature(publickKey, signature, sign_str); // 校验签名
-
-    req.body = queryStrToObject(req.body as string) as UploadCallbackRequestBody;
 
     isError = !verify || req.headers['x-oss-bucket'] !== useConfig().oss.bucketName;
   } catch (err) {
@@ -55,36 +76,9 @@ async function verifyCallback(
     return;
   }
 
+  // @ts-ignore
+  req.body = queryStrToObject(req.body);
   next();
-}
-
-/**
- * @description: 上传回调接口
- * @param {RouteRequest} req 请求
- * @param {RouteResponse} res 响应
- */
-async function uploadCallback(
-  req: RouteRequest<UploadCallbackRequestBody, UploadCallbackRequestQuery, any>,
-  res: RouteResponse<UploadCallbackResponseBody>
-) {
-  const { lastInsertRowid } = useDatabase()
-    .prepare<Pick<ResourcesTable, 'object' | 'size' | 'type' | 'hash'>>(
-      `INSERT INTO resources (object, size, type, hash) VALUES ($object, $size, $type, $hash)`
-    )
-    .run({
-      object: req.body.object,
-      size: req.body.size,
-      type: req.body.type,
-      hash: req.body.hash
-    }); // 插入资源数据
-
-  const flag: ResourceFlagPayload = {
-    token: req.body.token,
-    resourceId: lastInsertRowid as number
-  };
-  const flagText = encrypt(JSON.stringify(flag));
-
-  res.json(defineResponseBody({ data: { resourceFlag: flagText }, msg: '上传成功' }));
 }
 
 /**
@@ -92,7 +86,9 @@ async function uploadCallback(
  * @param {RouteRequest} req 请求对象
  * @return {Promise<string>} 公钥文本
  */
-async function getPublicKey(req: RouteRequest): Promise<string> {
+async function getPublicKey(
+  req: RouteRequest<string, UploadCallbackRequestQuery, void>
+): Promise<string> {
   const pubKeyUrl = base64ToString(req.headers['x-oss-pub-key-url'] as string);
   let httplib: typeof http | typeof https | undefined;
 
@@ -134,7 +130,9 @@ async function getPublicKey(req: RouteRequest): Promise<string> {
  * @param {RouteRequest} req 请求对象
  * @return {Buffer} 签名
  */
-function getAuthorization(req: RouteRequest): Promise<Buffer> {
+function getAuthorization(
+  req: RouteRequest<string, UploadCallbackRequestQuery, void>
+): Promise<Buffer> {
   const authorization = req.headers['authorization'];
   if (!authorization) {
     throw new Error('Failed: authorization field is not valid.');
@@ -147,7 +145,9 @@ function getAuthorization(req: RouteRequest): Promise<Buffer> {
  * @param {RouteRequest} req 请求对象
  * @return {Promise<string>} 待签名字符串
  */
-async function getSignStr(req: RouteRequest): Promise<string> {
+async function getSignStr(
+  req: RouteRequest<string, UploadCallbackRequestQuery, void>
+): Promise<string> {
   const fullReqUrl = new URL(req.url, `http://${req.headers.host}`);
   return decodeURIComponent(fullReqUrl.pathname) + fullReqUrl.search + '\n' + req.body;
 }
@@ -163,4 +163,12 @@ function verifySignature(pubKey: string, signature: Buffer, byteMD5: string): bo
   const verify = createVerify('RSA-MD5');
   verify.update(byteMD5);
   return verify.verify(pubKey, signature);
+}
+
+/**
+ * @description: 插入资源数据
+ */
+function insertResource(params: Pick<ResourcesTable, 'object' | 'size' | 'mime_type' | 'hash'>) {
+  const sql = `INSERT INTO resources (object, size, mime_type, hash) VALUES ($object, $size, $mime_type, $hash)`;
+  return useDatabase().prepare<typeof params>(sql).run(params);
 }

@@ -59,7 +59,7 @@ function initDatabase() {
       role_code TEXT NOT NULL REFERENCES roles (code) DEFAULT '002',
       
       -- 根文件夹路径
-      root_folder_path TEXT,
+      root_folder_path TEXT NOT NULL,
       
       -- 创建日期
       create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),

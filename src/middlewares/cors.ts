@@ -1,12 +1,12 @@
-import type { NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
 /**
  * @description: 处理跨域-中间件
- * @param {RouteRequest} req 请求
- * @param {RouteResponse} res 响应
+ * @param {Request} req 请求
+ * @param {Response} res 响应
  * @param {NextFunction} next 通过函数
  */
-export async function cors(req: RouteRequest, res: RouteResponse, next: NextFunction) {
+export async function cors(req: Request, res: Response, next: NextFunction) {
   //设置允许跨域的域名，*代表允许任意域名跨域
   res.header('Access-Control-Allow-Origin', '*');
   //允许的header类型

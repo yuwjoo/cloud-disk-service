@@ -47,7 +47,7 @@ export interface DirectorysTable {
   folder_path: string | null; // 文件夹路径
   name: string; // 名称
   size: number; // 大小
-  type: string; // 类型
+  type: 'folder' | 'file'; // 类型
   mime_type: string | null; // MIME类型
   resources_id: number | null; // 关联的资源id
   create_account: string; // 创建人账号

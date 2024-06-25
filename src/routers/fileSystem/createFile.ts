@@ -9,122 +9,129 @@ import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import { decrypt } from '@/utils/secure';
 
+/**
+ * @description: 创建文件接口
+ */
 export default defineRoute({
   method: 'get',
-  handler: createFile
+  handler: async (
+    req: RouteRequest<CreateFileRequestBody, CreateFileRequestQuery>,
+    res: RouteResponse<CreateFileResponseBody>
+  ) => {
+    const { query, locals } = req;
+
+    if (!query.fileName || !query.resourceFlag) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
+      return;
+    }
+
+    let folderPath = query.folderPath;
+
+    if (!folderPath || folderPath === '/') {
+      folderPath = locals.user.root_folder_path;
+    }
+
+    if (!folderPath.startsWith(locals.user.root_folder_path)) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
+      return;
+    }
+
+    let resourceFlag: ResourceFlagPayload | undefined; // 资源标识数据
+
+    try {
+      const data = JSON.parse(decrypt(query.resourceFlag));
+      if (data.token === locals.token) resourceFlag = data;
+    } catch (err) {}
+
+    if (!resourceFlag) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '资源标识已失效' }));
+      return;
+    }
+
+    const resource = selectResource(resourceFlag.resourceId);
+
+    if (!resource) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '资源不存在' }));
+      return;
+    }
+
+    let fileName = query.fileName;
+    const repeatFile = selectFile({ folder_path: folderPath, name: query.fileName });
+
+    if (repeatFile) {
+      // 文件名重复，追加时间戳文本
+      let pos = fileName.lastIndexOf('.');
+      if (pos === -1) {
+        fileName = `${fileName}_${Date.now()}`;
+      } else {
+        fileName = `${fileName.slice(0, pos)}_${Date.now()}${fileName.slice(pos)}`;
+      }
+    }
+
+    let fileData: Required<CreateFileResponseBody>['data']['fileData'] | undefined;
+    useDatabase().transaction(() => {
+      const { lastInsertRowid } = createFile({
+        folder_path: folderPath,
+        name: fileName,
+        size: resource.size,
+        mime_type: resource.mime_type,
+        resources_id: resource.id,
+        create_account: locals.user.account
+      });
+      addResourcReferenceCounte(resource.id);
+
+      fileData = {
+        id: lastInsertRowid as number,
+        name: fileName,
+        size: resource.size,
+        type: 'file',
+        mimeType: resource.mime_type,
+        createTime: (Date.now() / 1000) * 1000,
+        modifiedTime: (Date.now() / 1000) * 1000
+      };
+    })();
+
+    res.json(defineResponseBody({ data: { folderPath, fileData: fileData! }, msg: '创建成功' }));
+  }
 });
 
 /**
- * @description: 创建文件接口
- * @param {RouteRequest} req 请求
- * @param {RouteResponse} res 响应
+ * @description: 查询资源
  */
-async function createFile(
-  req: RouteRequest<CreateFileRequestBody, CreateFileRequestQuery>,
-  res: RouteResponse<CreateFileResponseBody>
+function selectResource(
+  params: ResourcesTable['id']
+): Pick<ResourcesTable, 'id' | 'size' | 'mime_type'> | undefined {
+  const sql = `SELECT id, size, mime_type FROM resources WHERE id = ?;`;
+  return useDatabase().prepare<typeof params, ReturnType<typeof selectResource>>(sql).get(params);
+}
+
+/**
+ * @description: 查询文件
+ */
+function selectFile(
+  params: Pick<DirectorysTable, 'folder_path' | 'name'>
+): Pick<DirectorysTable, 'id'> | undefined {
+  const sql = `SELECT id FROM directorys WHERE type = 'file' AND folder_path = $folder_path AND name = $name;`;
+  return useDatabase().prepare<typeof params, ReturnType<typeof selectFile>>(sql).get(params);
+}
+
+/**
+ * @description: 创建文件
+ */
+function createFile(
+  params: Pick<
+    DirectorysTable,
+    'folder_path' | 'name' | 'size' | 'mime_type' | 'resources_id' | 'create_account'
+  >
 ) {
-  if (!req.query.fileName || !req.query.resourceFlag) {
-    res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
-    return;
-  }
+  const sql = `INSERT INTO directorys ($folder_path, name, size, type, $mime_type, resources_id, create_account) VALUES ($folder_path, $name, $size, 'file', $mime_type, $resources_id, $create_account);`;
+  return useDatabase().prepare<typeof params>(sql).run(params);
+}
 
-  const folderId = req.query.folderId || res.locals.user.root_directory_id;
-  const folder = useDatabase()
-    .prepare<DirectorysTable['id'], Pick<DirectorysTable, 'create_account'>>(
-      `SELECT create_account FROM directorys WHERE id = ?`
-    )
-    .get(folderId); // 查询文件夹
-
-  if (!folder || folder.create_account !== res.locals.user.account) {
-    res.json(defineResponseBody({ code: responseCode.error, msg: '无法访问该文件夹' }));
-    return;
-  }
-
-  let resourceFlagData: ResourceFlagPayload; // 资源标识数据
-  let isFlagExpire: boolean; // 标识已失效
-
-  try {
-    resourceFlagData = JSON.parse(decrypt(req.query.resourceFlag));
-    isFlagExpire = resourceFlagData.token !== res.locals.token;
-  } catch (err) {
-    isFlagExpire = true;
-  }
-
-  if (isFlagExpire) {
-    res.json(defineResponseBody({ code: responseCode.error, msg: '资源标识已失效' }));
-    return;
-  }
-
-  const resource = useDatabase()
-    .prepare<ResourcesTable['id'], Pick<ResourcesTable, 'id' | 'size' | 'type'>>(
-      `SELECT id, size, type FROM resources WHERE id = ?`
-    )
-    .get(resourceFlagData!.resourceId);
-
-  if (!resource) {
-    res.json(defineResponseBody({ code: responseCode.error, msg: '资源不存在' }));
-    return;
-  }
-
-  const repeatFile = useDatabase()
-    .prepare<Pick<DirectorysTable, 'parent_id' | 'name'>, Pick<DirectorysTable, 'id'>>(
-      `SELECT id FROM directorys WHERE parent_id = $parent_id AND name = $name`
-    )
-    .get({
-      parent_id: folderId,
-      name: req.query.fileName
-    });
-
-  let fileName = req.query.fileName;
-  if (repeatFile) {
-    const pos = fileName.lastIndexOf('.');
-    fileName = `${fileName.slice(0, pos)}_${Date.now()}${fileName.slice(pos)}`;
-  }
-
-  let fileId: number | undefined;
-  useDatabase().transaction(() => {
-    const { lastInsertRowid } = useDatabase()
-      .prepare<
-        Pick<
-          DirectorysTable,
-          'name' | 'size' | 'type' | 'resources_id' | 'parent_id' | 'create_account'
-        >
-      >(
-        `INSERT INTO directorys
-          (name, size, type, resources_id, parent_id, create_account)
-      VALUES
-          ($name, $size, $type, $resources_id, $parent_id, $create_account)`
-      )
-      .run({
-        name: fileName,
-        size: resource.size,
-        type: resource.type,
-        resources_id: resource.id,
-        parent_id: folderId,
-        create_account: res.locals.user.account
-      }); // 插入文件数据
-    fileId = lastInsertRowid as number;
-    useDatabase()
-      .prepare<ResourcesTable['id']>(
-        `UPDATE resources SET reference_count = reference_count + 1, modified_date = datetime (CURRENT_TIMESTAMP, 'localtime') WHERE id = ?;`
-      )
-      .run(resource.id); // 更新资源引用计数
-  })();
-
-  res.json(
-    defineResponseBody({
-      data: {
-        folderId,
-        fileData: {
-          id: fileId!,
-          name: fileName,
-          size: resource.size,
-          type: resource.type,
-          createTime: Date.now(),
-          modifiedTime: Date.now()
-        }
-      },
-      msg: '创建成功'
-    })
-  );
+/**
+ * @description: 增加资源引用计数
+ */
+function addResourcReferenceCounte(params: ResourcesTable['id']) {
+  const sql = `UPDATE resources SET reference_count = reference_count + 1, modified_date = datetime (CURRENT_TIMESTAMP, 'localtime') WHERE id = ?;`;
+  return useDatabase().prepare<typeof params>(sql).run(params);
 }

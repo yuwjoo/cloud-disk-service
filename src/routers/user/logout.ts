@@ -7,28 +7,28 @@ import type {
 import { useDatabase } from '@/utils/database';
 import { defineResponseBody, defineRoute } from '@/utils/router';
 
+/**
+ * @description: 退出登录接口
+ */
 export default defineRoute({
   method: 'get',
-  handler: logout,
-  options: { authorization: false }
+  options: { authorization: false },
+  handler: async (
+    req: RouteRequest<LogoutRequestBody, LogoutRequestQuery, void>,
+    res: RouteResponse<LogoutResponseBody>
+  ) => {
+    const { authorization } = req.headers;
+
+    if (authorization) deleteToken(authorization);
+
+    res.json(defineResponseBody());
+  }
 });
 
 /**
- * @description: 退出登录接口
- * @param {RouteRequest} req 请求
- * @param {RouteResponse} res 响应
+ * @description: 删除指定token记录
  */
-async function logout(
-  req: RouteRequest<LogoutRequestBody, LogoutRequestQuery>,
-  res: RouteResponse<LogoutResponseBody>
-) {
-  const token: LoginRecordsTable['token'] | undefined = req.header('Authorization');
-
-  if (token) {
-    useDatabase()
-      .prepare<LoginRecordsTable['token']>(`DELETE FROM login_records WHERE token = ?;`)
-      .run(token); // 删除指定登录记录
-  }
-
-  res.json(defineResponseBody({ msg: '已退出登录' }));
+function deleteToken(params: LoginRecordsTable['token']) {
+  const sql = `DELETE FROM login_records WHERE token = ?;`;
+  return useDatabase().prepare<typeof params>(sql).run(params);
 }

@@ -2,10 +2,10 @@
 export type UploadCallbackRequestBody = {
   token: string; // token
   object: string; // oss object
-  name: string; // 文件名称
-  size: number; // 文件大小
-  type: string; // 文件类型
-  hash: string; // 文件hash
+  name: string; // 名称
+  size: number; // 大小
+  mimetype?: string; // mime类型
+  hash: string; // hash
 };
 
 // oss上传回调接口-请求query
