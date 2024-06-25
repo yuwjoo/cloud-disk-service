@@ -25,7 +25,7 @@ export default defineRoute({
       return;
     }
 
-    let folderPath = query.folderPath || locals.user.root_folder_path;
+    const folderPath = query.parentFolderPath || locals.user.root_folder_path;
 
     if (!folderPath.startsWith(locals.user.root_folder_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
@@ -64,7 +64,7 @@ export default defineRoute({
       }
     }
 
-    let fileData: Required<CreateFileResponseBody>['data']['fileData'] | undefined;
+    let fileData: CreateFileResponseBody['data'] | undefined;
     useDatabase().transaction(() => {
       const { lastInsertRowid } = createFile({
         folder_path: folderPath,
@@ -82,12 +82,13 @@ export default defineRoute({
         size: resource.size,
         type: 'file',
         mimeType: resource.mime_type,
+        parentFolderPath: folderPath,
         createTime: (Date.now() / 1000) * 1000,
         modifiedTime: (Date.now() / 1000) * 1000
       };
     })();
 
-    res.json(defineResponseBody({ data: { folderPath, fileData: fileData! }, msg: '创建成功' }));
+    res.json(defineResponseBody({ data: fileData, msg: '创建成功' }));
   }
 });
 

@@ -25,6 +25,11 @@ export default defineRoute({
       return;
     }
 
+    if (!/^[^"*<>?\\|/:]+$/.test(body.account)) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '非法账号名' }));
+      return;
+    }
+
     const userRow = selectUser({ account: body.account });
 
     if (userRow) {

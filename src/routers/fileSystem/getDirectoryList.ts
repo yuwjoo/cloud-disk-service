@@ -18,7 +18,7 @@ export default defineRoute({
   ) => {
     const { query, locals } = req;
 
-    let folderPath = query.folderPath || locals.user.root_folder_path;
+    const folderPath = query.folderPath || locals.user.root_folder_path;
 
     if (!folderPath.startsWith(locals.user.root_folder_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
@@ -37,16 +37,30 @@ export default defineRoute({
         size: directory.size,
         type: directory.type,
         mimeType: directory.mime_type,
-        folderPath,
+        parentFolderPath: folderPath,
         createTime: new Date(directory.create_date).getTime(),
         modifiedTime: new Date(directory.modified_date).getTime()
       };
       directory.type === 'folder' ? folderList.push(temp) : fileList.push(temp);
     });
 
-    res.json(defineResponseBody({ data: { folderPath, list: folderList.concat(fileList) } }));
+    res.json(
+      defineResponseBody({
+        data: { parentFolderPath: folderPath, list: folderList.concat(fileList) }
+      })
+    );
   }
 });
+
+/**
+ * @description: 查询目录
+ */
+function selectDirectory(params: Pick<DirectorysTable, 'id' | 'folder_path'>) {
+  type SQLResult = Pick<DirectorysTable, 'folder_path'>;
+
+  const sql = `SELECT folder_path FROM directorys WHERE id = $id OR folder_path = $folder_path;`;
+  return useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
+}
 
 /**
  * @description: 查询目录列表

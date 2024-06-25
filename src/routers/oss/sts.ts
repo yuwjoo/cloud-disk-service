@@ -6,7 +6,7 @@ import { defineResponseBody, defineRoute } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import tinytime from 'tinytime';
 
-const timeTemplate = tinytime('{YYYY}-{MM}-{DD}/{H}H{mm}M{ss}S'); // 时间格式化模板
+const timeTemplate = tinytime('{YYYY}-{Mo}-{DD}/{H}H{mm}M{ss}S', { padMonth: true }); // 时间格式化模板
 
 /**
  * @description: sts临时访问凭证接口
