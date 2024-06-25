@@ -32,7 +32,7 @@ export default defineRoute({
     const { lastInsertRowid } = insertResource({
       object: body.object,
       size: body.size,
-      mime_type: body.mimetype || null,
+      mime_type: body.mimeType || null,
       hash: body.hash
     });
     const flag: ResourceFlagPayload = {

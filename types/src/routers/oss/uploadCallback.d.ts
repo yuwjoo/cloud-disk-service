@@ -2,9 +2,8 @@
 export type UploadCallbackRequestBody = {
   token: string; // token
   object: string; // oss object
-  name: string; // 名称
   size: number; // 大小
-  mimetype?: string; // mime类型
+  mimeType?: string; // mime类型
   hash: string; // hash
 };
 

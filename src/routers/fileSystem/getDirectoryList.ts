@@ -18,11 +18,7 @@ export default defineRoute({
   ) => {
     const { query, locals } = req;
 
-    let folderPath = query.folderPath;
-
-    if (!folderPath || folderPath === '/') {
-      folderPath = locals.user.root_folder_path;
-    }
+    let folderPath = query.folderPath || locals.user.root_folder_path;
 
     if (!folderPath.startsWith(locals.user.root_folder_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
@@ -41,6 +37,7 @@ export default defineRoute({
         size: directory.size,
         type: directory.type,
         mimeType: directory.mime_type,
+        folderPath,
         createTime: new Date(directory.create_date).getTime(),
         modifiedTime: new Date(directory.modified_date).getTime()
       };

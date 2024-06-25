@@ -25,11 +25,7 @@ export default defineRoute({
       return;
     }
 
-    let folderPath = query.folderPath;
-
-    if (!folderPath || folderPath === '/') {
-      folderPath = locals.user.root_folder_path;
-    }
+    let folderPath = query.folderPath || locals.user.root_folder_path;
 
     if (!folderPath.startsWith(locals.user.root_folder_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
@@ -124,7 +120,7 @@ function createFile(
     'folder_path' | 'name' | 'size' | 'mime_type' | 'resources_id' | 'create_account'
   >
 ) {
-  const sql = `INSERT INTO directorys ($folder_path, name, size, type, $mime_type, resources_id, create_account) VALUES ($folder_path, $name, $size, 'file', $mime_type, $resources_id, $create_account);`;
+  const sql = `INSERT INTO directorys (folder_path, name, size, type, mime_type, resources_id, create_account) VALUES ($folder_path, $name, $size, 'file', $mime_type, $resources_id, $create_account);`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }
 

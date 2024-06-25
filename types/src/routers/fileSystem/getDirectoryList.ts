@@ -17,6 +17,7 @@ export type GetDirectoryListResponseBody = ResponseBody<{
     size: DirectorysTable['size']; // 大小
     type: DirectorysTable['type']; // 类型
     mimeType: DirectorysTable['mime_type']; // mime类型
+    folderPath: string; // 文件夹路径
     createTime: number; // 创日期时间戳
     modifiedTime: number; // 修改日期时间戳
   }[];

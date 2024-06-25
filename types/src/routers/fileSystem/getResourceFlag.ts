@@ -8,9 +8,7 @@ export type GetResourceFlagRequestQuery = {
 };
 
 // 获取资源标识接口-响应body
-export type GetResourceFlagResponseBody = ResponseBody<{
-  resourceFlag?: string; // 资源标识
-}>;
+export type GetResourceFlagResponseBody = ResponseBody<string>; // 资源标识
 
 // 资源标识负载
 export type ResourceFlagPayload = {

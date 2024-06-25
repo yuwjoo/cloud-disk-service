@@ -18,7 +18,7 @@ export default defineRoute({
     req: RouteRequest<GetResourceFlagRequestBody, GetResourceFlagRequestQuery>,
     res: RouteResponse<GetResourceFlagResponseBody>
   ) => {
-    const { query } = req;
+    const { query, locals } = req;
 
     if (!query.fileHash || query.fileSize === undefined) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
@@ -28,12 +28,12 @@ export default defineRoute({
     const resourceRow = selectResource({ hash: query.fileHash, size: query.fileSize });
 
     const flag: ResourceFlagPayload = {
-      token: res.locals.token,
+      token: locals.token,
       resourceId: resourceRow?.id || -1
     };
     const flagText = resourceRow ? encrypt(JSON.stringify(flag)) : undefined;
 
-    res.json(defineResponseBody({ data: { resourceFlag: flagText } }));
+    res.json(defineResponseBody({ data: flagText }));
   }
 });
 
