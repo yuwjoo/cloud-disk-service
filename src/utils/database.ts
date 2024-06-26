@@ -58,8 +58,8 @@ function initDatabase() {
       -- 角色code (默认 普通用户: 002)
       role_code TEXT NOT NULL REFERENCES roles (code) DEFAULT '002',
       
-      -- 根文件夹路径
-      root_folder_path TEXT NOT NULL,
+      -- 根文件夹id
+      root_folder_id INTEGER NOT NULL,
       
       -- 创建日期
       create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),
@@ -155,8 +155,8 @@ function initDatabase() {
       -- id
       id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-      -- 文件夹路径
-      folder_path TEXT,
+      -- 父级路径
+      parent_path TEXT,
     
       -- 名称
       name TEXT NOT NULL,
