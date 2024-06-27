@@ -5,7 +5,7 @@ export interface UsersTable {
   avatar: string | null; // 头像
   status: 'enable' | 'disabled'; // enable: 启用；disabled: 禁用
   role_code: string; // 角色code
-  root_folder_path: string; // 根文件夹路径
+  root_folder_id: number; // 根文件夹id
   create_date: string; // 创建日期
   modified_date: string; // 修改日期
 } // 用户表
@@ -44,7 +44,7 @@ export interface ResourcesTable {
 
 export interface DirectorysTable {
   id: number; // id
-  folder_path: string | null; // 文件夹路径
+  parent_path: string; // 父级路径
   name: string; // 名称
   size: number; // 大小
   type: 'folder' | 'file'; // 类型

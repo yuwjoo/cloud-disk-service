@@ -7,6 +7,7 @@ import type {
 import { useDatabase } from '@/utils/database';
 import { createHash } from '@/utils/secure';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
+import { testFilename } from '@/utils/rules';
 
 /**
  * @description: 注册接口
@@ -25,7 +26,7 @@ export default defineRoute({
       return;
     }
 
-    if (!/^[^"*<>?\\|/:]+$/.test(body.account)) {
+    if (!testFilename(body.account)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '非法账号名' }));
       return;
     }
@@ -38,8 +39,8 @@ export default defineRoute({
     }
 
     useDatabase().transaction(() => {
-      createUserRootFolder({
-        folder_path: '/',
+      const { lastInsertRowid } = createUserRootFolder({
+        parent_path: '/',
         name: body.account,
         type: 'folder',
         create_account: body.account
@@ -49,7 +50,7 @@ export default defineRoute({
         nickname: body.nickname || body.account,
         account: body.account,
         password: createHash(body.password),
-        root_folder_path: '/' + body.account
+        root_folder_id: lastInsertRowid as number
       }); // 创建用户
     })();
 
@@ -69,9 +70,9 @@ function selectUser(params: Pick<UsersTable, 'account'>): Pick<UsersTable, 'acco
  * @description: 创建用户根文件夹
  */
 function createUserRootFolder(
-  params: Pick<DirectorysTable, 'folder_path' | 'name' | 'type' | 'create_account'>
+  params: Pick<DirectorysTable, 'parent_path' | 'name' | 'type' | 'create_account'>
 ) {
-  const sql = `INSERT INTO directorys (folder_path, name, type, create_account) VALUES ($folder_path, $name, $type, $create_account)`;
+  const sql = `INSERT INTO directorys (parent_path, name, type, create_account) VALUES ($parent_path, $name, $type, $create_account)`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }
 
@@ -79,8 +80,8 @@ function createUserRootFolder(
  * @description: 创建用户
  */
 function createUser(
-  params: Pick<UsersTable, 'nickname' | 'account' | 'password' | 'root_folder_path'>
+  params: Pick<UsersTable, 'nickname' | 'account' | 'password' | 'root_folder_id'>
 ) {
-  const sql = `INSERT INTO users (nickname, account, password, root_folder_path) VALUES ( $nickname, $account, $password, $root_folder_path );`;
+  const sql = `INSERT INTO users (nickname, account, password, root_folder_id) VALUES ( $nickname, $account, $password, $root_folder_id );`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }

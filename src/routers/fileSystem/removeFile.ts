@@ -23,9 +23,11 @@ export default defineRoute({
       return;
     }
 
+    const rootFolderRow = selectFolderById(locals.user.root_folder_id);
+
     const fileRow = selectFile({ id: query.fileId });
 
-    if (!fileRow || !fileRow.folder_path?.startsWith(locals.user.root_folder_path)) {
+    if (!rootFolderRow || !fileRow || !fileRow.parent_path.startsWith(rootFolderRow.parent_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
       return;
     }
@@ -37,12 +39,22 @@ export default defineRoute({
 });
 
 /**
+ * @description: 根据id查询文件夹
+ */
+function selectFolderById(
+  params: DirectorysTable['id']
+): Pick<DirectorysTable, 'id' | 'parent_path' | 'name'> | undefined {
+  const sql = `SELECT id, parent_path, name FROM directorys WHERE type = 'folder' AND id = ?;`;
+  return useDatabase().prepare<typeof params, ReturnType<typeof selectFolderById>>(sql).get(params);
+}
+
+/**
  * @description: 查询文件
  */
 function selectFile(
   params: Pick<DirectorysTable, 'id'>
-): Pick<DirectorysTable, 'folder_path'> | undefined {
-  const sql = `SELECT folder_path FROM directorys WHERE type = 'file' AND id = $id;`;
+): Pick<DirectorysTable, 'parent_path'> | undefined {
+  const sql = `SELECT parent_path FROM directorys WHERE type = 'file' AND id = $id;`;
   return useDatabase().prepare<typeof params, ReturnType<typeof selectFile>>(sql).get(params);
 }
 

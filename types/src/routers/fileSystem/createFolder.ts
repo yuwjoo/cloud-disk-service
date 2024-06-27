@@ -5,7 +5,7 @@ export type CreateFolderRequestBody = void;
 
 // 创建文件夹接口-请求query
 export type CreateFolderRequestQuery = {
-  parentFolderPath?: Required<DirectorysTable['folder_path']>; // 父级文件夹路径
+  parentFolderId?: Required<DirectorysTable['id']>; // 父级文件夹id
   folderName: DirectorysTable['name']; // 文件夹名称
 };
 
@@ -15,7 +15,8 @@ export type CreateFolderResponseBody = ResponseBody<{
   name: DirectorysTable['name']; // 名称
   size: DirectorysTable['size']; // 大小
   type: DirectorysTable['type']; // 类型
-  parentFolderPath: string; // 父级文件夹路径
+  mimeType: DirectorysTable['mime_type']; // mime类型
+  parentFolderId: DirectorysTable['id']; // 父级文件夹id
   createTime: number; // 创建日期时间戳
   modifiedTime: number; // 修改日期时间戳
 }>;

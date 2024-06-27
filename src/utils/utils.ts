@@ -1,3 +1,5 @@
+import path from 'path';
+
 /**
  * @description: 对象转查询字符串
  * @param {Record} obj 对象
@@ -47,28 +49,18 @@ export function base64ToString(base64: string): string {
 
 /**
  * @description: 拆分路径
- * @param {string} path 路径
- * @return {{ parent: string, folder: string }} 路径数据
+ * @param {string} path 路径字符串
+ * @return {string[]} 路径数组
  */
-export function splitPath(path: string): { parent: string; folder: string } {
-  const clipPath = path.endsWith('/') ? path.slice(0, -1) : path;
-  const lastIndex = clipPath.lastIndexOf('/');
-  const parent = clipPath.slice(0, lastIndex + 1);
-  const folder = clipPath.slice(lastIndex + 1) + '/';
-
-  return { parent, folder };
+export function splitPath(path: string): string[] {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean);
 }
 
 /**
  * @description: 合并路径
- * @param {string} parent 父级路径
- * @param {string} folder 文件夹
- * @return {string} 路径
+ * @param {string[]} args 路径参数
+ * @return {string} 路径字符串
  */
-export function mergePath(parent: string, folder: string): string {
-  const clipParent = parent.endsWith('/') ? parent : parent + '/';
-  const clipFolder = folder.endsWith('/') ? folder : folder + '/';
-  const path = clipParent + clipFolder;
-
-  return path.trim() === '//' ? '/' : path;
+export function mergePath(...args: string[]): string {
+  return path.join(...args).replace(/\\/g, '/');
 }

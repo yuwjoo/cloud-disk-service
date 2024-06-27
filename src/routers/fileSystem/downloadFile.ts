@@ -24,29 +24,30 @@ export default defineRoute({
       return;
     }
 
-    const directoryRow = selectFile(query.fileId);
+    const rootFolderRow = selectFolderById(locals.user.root_folder_id);
+    const fileRow = selectFile(query.fileId);
 
-    if (!directoryRow || !directoryRow.folder_path?.startsWith(locals.user.root_folder_path)) {
+    if (!rootFolderRow || !fileRow || !fileRow.parent_path.startsWith(rootFolderRow.parent_path)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无法访问该文件' }));
       return;
     }
 
-    if (directoryRow.type === 'folder' || !directoryRow.resources_id) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '非文件类型, 无法下载' }));
+    if (!fileRow.resources_id) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '未关联资源' }));
       return;
     }
 
-    const resourceRow = selectResource(directoryRow.resources_id);
+    const resourceRow = selectResource(fileRow.resources_id);
 
     if (!resourceRow) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '相关资源不存在' }));
+      res.json(defineResponseBody({ code: responseCode.error, msg: '资源未找到' }));
       return;
     }
 
     const downloadUrl = useAdmin().signatureUrl(resourceRow.object, {
       expires: 5, // 签名url过期时间（秒）
       response: {
-        'content-disposition': `attachment; filename=${encodeURIComponent(directoryRow.name)}` // 下载文件名
+        'content-disposition': `attachment; filename=${encodeURIComponent(fileRow.name)}` // 下载文件名
       }
     });
 
@@ -55,12 +56,22 @@ export default defineRoute({
 });
 
 /**
+ * @description: 根据id查询文件夹
+ */
+function selectFolderById(
+  params: DirectorysTable['id']
+): Pick<DirectorysTable, 'id' | 'parent_path' | 'name'> | undefined {
+  const sql = `SELECT id, parent_path, name FROM directorys WHERE type = 'folder' AND id = ?;`;
+  return useDatabase().prepare<typeof params, ReturnType<typeof selectFolderById>>(sql).get(params);
+}
+
+/**
  * @description: 查询文件
  */
 function selectFile(
   params: DirectorysTable['id']
-): Pick<DirectorysTable, 'folder_path' | 'name' | 'type' | 'resources_id'> | undefined {
-  const sql = `SELECT folder_path, name, type, resources_id FROM directorys WHERE id = ?;`;
+): Pick<DirectorysTable, 'parent_path' | 'name' | 'resources_id'> | undefined {
+  const sql = `SELECT parent_path, name, resources_id FROM directorys WHERE type = 'file' AND id = ?;`;
   return useDatabase().prepare<typeof params, ReturnType<typeof selectFile>>(sql).get(params);
 }
 

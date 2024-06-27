@@ -19,20 +19,34 @@ export default defineRoute({
   ) => {
     const { query, locals } = req;
 
-    const folderRow = selectFolder({
-      id: query.folderId,
-      folder_path: locals.user.root_folder_path
-    });
+    const rootFolderRow = selectFolderById(locals.user.root_folder_id);
+    let parentFolderRow;
 
-    if (!folderRow || !folderRow.folder_path?.startsWith(locals.user.root_folder_path)) {
+    if (query.parentFolderId) {
+      parentFolderRow = selectFolderById(query.parentFolderId);
+    } else {
+      parentFolderRow = rootFolderRow;
+    }
+
+    if (!rootFolderRow || !parentFolderRow) {
+      res.json(defineResponseBody({ code: responseCode.error, msg: '文件夹不存在' }));
+      return;
+    }
+
+    const rootFolderPath = mergePath(rootFolderRow.parent_path, rootFolderRow.name);
+    const parentFolderPath = mergePath(parentFolderRow.parent_path, parentFolderRow.name);
+
+    if (!parentFolderPath.startsWith(rootFolderPath)) {
       res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
       return;
     }
 
-    const directoryRows = selectDirectorys({ folder_path: folderPath });
+    const folderPathList = selectFolderPathList(rootFolderPath, parentFolderPath);
 
-    let folderList: Required<GetDirectoryListResponseBody>['data']['list'] = [];
-    let fileList: Required<GetDirectoryListResponseBody>['data']['list'] = [];
+    const directoryRows = selectDirectorys({ parent_path: parentFolderPath });
+
+    let folderList: Required<GetDirectoryListResponseBody>['data']['directoryList'] = [];
+    let fileList: Required<GetDirectoryListResponseBody>['data']['directoryList'] = [];
 
     directoryRows.forEach((directory) => {
       const temp = {
@@ -41,7 +55,7 @@ export default defineRoute({
         size: directory.size,
         type: directory.type,
         mimeType: directory.mime_type,
-        parentFolderPath: folderPath,
+        parentFolderId: parentFolderRow.id,
         createTime: new Date(directory.create_date).getTime(),
         modifiedTime: new Date(directory.modified_date).getTime()
       };
@@ -50,7 +64,10 @@ export default defineRoute({
 
     res.json(
       defineResponseBody({
-        data: { parentFolderPath: folderPath, list: folderList.concat(fileList) }
+        data: {
+          folderPathList,
+          directoryList: folderList.concat(fileList)
+        }
       })
     );
   }
@@ -59,38 +76,61 @@ export default defineRoute({
 /**
  * @description: 根据id查询文件夹
  */
-function selectFolderById(params: DirectorysTable['id']): string {
-  type SQLResult = Pick<DirectorysTable, 'folder_path' | 'name'>;
-
-  const sql = `SELECT folder_path, name FROM directorys WHERE type = 'folder' AND id = $id;`;
-  const folderRow = useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
-  return folderRow ? mergePath(folderRow.folder_path || '', folderRow.name) : '';
+function selectFolderById(
+  params: DirectorysTable['id']
+): Pick<DirectorysTable, 'id' | 'parent_path' | 'name'> | undefined {
+  const sql = `SELECT id, parent_path, name FROM directorys WHERE type = 'folder' AND id = ?;`;
+  return useDatabase().prepare<typeof params, ReturnType<typeof selectFolderById>>(sql).get(params);
 }
 
 /**
- * @description: 根据路径查询文件夹
+ * @description: 查询文件夹路径列表
  */
-function selectFolderByPath(params: Partial<Pick<DirectorysTable, 'id'> & { path: string }>) {
-  type SQLResult = Pick<DirectorysTable, 'folder_path'>;
+function selectFolderPathList(
+  rootPath: string,
+  folderPath: string
+): Required<GetDirectoryListResponseBody>['data']['folderPathList'] {
+  let sqlWhereParams = [];
+  let sqlWhereTexts = [];
+  let whileCount = 0;
 
-  if (params.id) {
-    const sql = `SELECT folder_path FROM directorys WHERE type = 'folder' AND id = $id;`;
-    return useDatabase().prepare<typeof params, SQLResult>(sql).get({ id: params.id });
-  } else {
-    const sql = `SELECT folder_path FROM directorys WHERE type = 'folder' AND folder_path = $folder_path AND name = $name;`;
-    return useDatabase().prepare<typeof params, SQLResult>(sql).get({ id: params.id });
-  }
+  do {
+    const pos = folderPath.lastIndexOf('/');
+    const parentPath = folderPath.slice(0, pos);
+    const folderName = folderPath.slice(pos + 1);
+    sqlWhereParams.push(parentPath || '/', folderName || '/');
+    sqlWhereTexts.push(`(parent_path = ? AND name = ?)`);
+    folderPath = parentPath;
+    if (++whileCount > 500) throw new Error('查询文件夹路径循环体异常, folderPath: ' + folderPath);
+  } while (folderPath && folderPath.startsWith(rootPath));
+
+  const sql = `
+    SELECT
+      id, parent_path, name
+    FROM
+      directorys
+    WHERE
+      type = 'folder' AND ${sqlWhereTexts.join(' OR ')}
+  `;
+  const folderRows = useDatabase()
+    .prepare<string[], Pick<DirectorysTable, 'id' | 'parent_path' | 'name'>>(sql)
+    .all(...sqlWhereParams);
+
+  return (folderRows || []).map((row, index) => ({
+    folderId: row.id,
+    folderName: index === 0 ? '/' : mergePath(row.parent_path, row.name)
+  }));
 }
 
 /**
  * @description: 查询目录列表
  */
-function selectDirectorys(params: Pick<DirectorysTable, 'folder_path'>) {
+function selectDirectorys(params: Pick<DirectorysTable, 'parent_path'>) {
   type SQLResult = Pick<
     DirectorysTable,
     'id' | 'name' | 'size' | 'type' | 'mime_type' | 'create_date' | 'modified_date'
   >;
 
-  const sql = `SELECT id, name, size, type, mime_type, create_date, modified_date FROM directorys WHERE folder_path = $folder_path ORDER BY name ASC;`;
+  const sql = `SELECT id, name, size, type, mime_type, create_date, modified_date FROM directorys WHERE parent_path = $parent_path ORDER BY name ASC;`;
   return useDatabase().prepare<typeof params, SQLResult>(sql).all(params);
 }

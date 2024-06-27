@@ -156,7 +156,7 @@ function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
 
       -- 父级路径
-      parent_path TEXT,
+      parent_path TEXT NOT NULL,
     
       -- 名称
       name TEXT NOT NULL,
@@ -188,15 +188,21 @@ function initDatabase() {
   db.prepare('INSERT OR IGNORE INTO roles (code, name) VALUES (?, ?)').run('001', '管理员');
   db.prepare('INSERT OR IGNORE INTO roles (code, name) VALUES (?, ?)').run('002', '普通用户');
 
+  // 初始化目录数据
+  const { lastInsertRowid } = db
+    .prepare(
+      'INSERT OR IGNORE INTO directorys (parent_path, name, type, create_account) VALUES (?, ?, ?, ?)'
+    )
+    .run('/', '/', 'folder', useConfig().admin.account);
+
   // 初始化账号数据
   db.prepare(
-    'INSERT OR IGNORE INTO users (account, password, nickname, role_code, root_folder_path) VALUES (?, ?, ?, ?, ?)'
-  ).run(useConfig().admin.account, createHash(useConfig().admin.password), '管理员', '001', '/');
-
-  // 初始化目录数据
-  db.prepare('INSERT OR IGNORE INTO directorys (name, type, create_account) VALUES (?, ?, ?)').run(
-    '/',
-    'folder',
-    useConfig().admin.account
+    'INSERT OR IGNORE INTO users (account, password, nickname, role_code, root_folder_id) VALUES (?, ?, ?, ?, ?)'
+  ).run(
+    useConfig().admin.account,
+    createHash(useConfig().admin.password),
+    '管理员',
+    '001',
+    lastInsertRowid
   );
 }
