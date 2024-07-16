@@ -118,7 +118,7 @@ function selectFolderPathList(
 
   return (folderRows || []).map((row, index) => ({
     folderId: row.id,
-    folderName: index === 0 ? '/' : mergePath(row.parent_path, row.name)
+    folderName: index === 0 ? '/' : row.name
   }));
 }
 
