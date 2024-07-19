@@ -32,7 +32,6 @@ export default defineRoute({
     const { lastInsertRowid } = insertResource({
       object: body.object,
       size: body.size,
-      mime_type: body.mimeType || null,
       hash: body.hash
     });
     const flag: ResourceFlagPayload = {
@@ -168,7 +167,7 @@ function verifySignature(pubKey: string, signature: Buffer, byteMD5: string): bo
 /**
  * @description: 插入资源数据
  */
-function insertResource(params: Pick<ResourcesTable, 'object' | 'size' | 'mime_type' | 'hash'>) {
-  const sql = `INSERT INTO resources (object, size, mime_type, hash) VALUES ($object, $size, $mime_type, $hash)`;
+function insertResource(params: Pick<ResourcesTable, 'object' | 'size' | 'hash'>) {
+  const sql = `INSERT INTO resources (object, size, hash) VALUES ($object, $size, $hash)`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }

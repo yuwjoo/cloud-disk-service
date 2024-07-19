@@ -7,6 +7,7 @@ import type {
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import { useAdmin } from '@/utils/oss';
+import { joinPath } from '@/utils/utils';
 
 /**
  * @description: 下载文件接口
@@ -19,29 +20,28 @@ export default defineRoute({
   ) => {
     const { query, locals } = req;
 
-    if (!query.fileId) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '文件id不能为空' }));
-      return;
+    if (!query.filePath) {
+      throw { code: responseCode.error, msg: '文件id不能为空' };
     }
 
-    const rootFolderRow = selectFolderById(locals.user.root_folder_id);
-    const fileRow = selectFile(query.fileId);
+    const pos = query.filePath.lastIndexOf('/');
+    const folderPath = query.filePath.slice(0, pos);
+    const filename = query.filePath.slice(pos + 1);
+    const innerFilePath = joinPath(locals.user.root_path, folderPath);
+    const fileRow = selectFile({ path: innerFilePath, name: filename });
 
-    if (!rootFolderRow || !fileRow || !fileRow.parent_path.startsWith(rootFolderRow.parent_path)) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '无法访问该文件' }));
-      return;
+    if (!fileRow) {
+      throw { code: responseCode.error, msg: '未找到该文件' };
     }
 
     if (!fileRow.resources_id) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '未关联资源' }));
-      return;
+      throw { code: responseCode.error, msg: '文件资源已被删除' };
     }
 
     const resourceRow = selectResource(fileRow.resources_id);
 
     if (!resourceRow) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '资源未找到' }));
-      return;
+      throw { code: responseCode.error, msg: '文件资源已被删除' };
     }
 
     const downloadUrl = useAdmin().signatureUrl(resourceRow.object, {
@@ -56,22 +56,12 @@ export default defineRoute({
 });
 
 /**
- * @description: 根据id查询文件夹
- */
-function selectFolderById(
-  params: DirectorysTable['id']
-): Pick<DirectorysTable, 'id' | 'parent_path' | 'name'> | undefined {
-  const sql = `SELECT id, parent_path, name FROM directorys WHERE type = 'folder' AND id = ?;`;
-  return useDatabase().prepare<typeof params, ReturnType<typeof selectFolderById>>(sql).get(params);
-}
-
-/**
  * @description: 查询文件
  */
 function selectFile(
-  params: DirectorysTable['id']
-): Pick<DirectorysTable, 'parent_path' | 'name' | 'resources_id'> | undefined {
-  const sql = `SELECT parent_path, name, resources_id FROM directorys WHERE type = 'file' AND id = ?;`;
+  params: Pick<DirectorysTable, 'path' | 'name'>
+): Pick<DirectorysTable, 'path' | 'name' | 'resources_id'> | undefined {
+  const sql = `SELECT path, name, resources_id FROM directorys WHERE type = 'file' AND path = $path AND name = $name;`;
   return useDatabase().prepare<typeof params, ReturnType<typeof selectFile>>(sql).get(params);
 }
 

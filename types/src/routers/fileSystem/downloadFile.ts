@@ -5,7 +5,7 @@ export type DownloadFileRequestBody = void;
 
 // 下载文件接口-请求query
 export type DownloadFileRequestQuery = {
-  fileId?: DirectorysTable['id']; // 文件id
+  filePath: DirectorysTable['path']; // 文件路径
 };
 
 // 下载文件接口-响应body

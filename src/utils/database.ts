@@ -58,8 +58,8 @@ function initDatabase() {
       -- 角色code (默认 普通用户: 002)
       role_code TEXT NOT NULL REFERENCES roles (code) DEFAULT '002',
       
-      -- 根文件夹id
-      root_folder_id INTEGER NOT NULL,
+      -- 根目录路径
+      root_path TEXT NOT NULL,
       
       -- 创建日期
       create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),
@@ -131,9 +131,6 @@ function initDatabase() {
     
       -- 资源大小
       size REAL NOT NULL DEFAULT 0,
-
-      -- 资源MIME类型
-      mime_type TEXT,
     
       -- hash值
       hash TEXT NOT NULL,
@@ -155,26 +152,23 @@ function initDatabase() {
       -- id
       id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-      -- 父级路径
-      parent_path TEXT NOT NULL,
+      -- 路径
+      path TEXT NOT NULL,
     
       -- 名称
       name TEXT NOT NULL,
+
+      -- 类型
+      type TEXT NOT NULL,
       
       -- 大小
       size REAL NOT NULL DEFAULT 0,
 
-      -- 类型
-      type TEXT NOT NULL,
-
-      -- MIME类型
-      mime_type TEXT,
+      -- 封面
+      cover TEXT NOT NULL,
     
-      -- 关联的资源id
+      -- 资源id
       resources_id INTEGER REFERENCES resources(id) ON DELETE SET NULL,
-    
-      -- 创建人账号
-      create_account TEXT NOT NULL,
     
       -- 创建日期
       create_date DATETIME NOT NULL DEFAULT (datetime (CURRENT_TIMESTAMP, 'localtime')),
@@ -188,21 +182,8 @@ function initDatabase() {
   db.prepare('INSERT OR IGNORE INTO roles (code, name) VALUES (?, ?)').run('001', '管理员');
   db.prepare('INSERT OR IGNORE INTO roles (code, name) VALUES (?, ?)').run('002', '普通用户');
 
-  // 初始化目录数据
-  const { lastInsertRowid } = db
-    .prepare(
-      'INSERT OR IGNORE INTO directorys (parent_path, name, type, create_account) VALUES (?, ?, ?, ?)'
-    )
-    .run('/', '/', 'folder', useConfig().admin.account);
-
   // 初始化账号数据
   db.prepare(
-    'INSERT OR IGNORE INTO users (account, password, nickname, role_code, root_folder_id) VALUES (?, ?, ?, ?, ?)'
-  ).run(
-    useConfig().admin.account,
-    createHash(useConfig().admin.password),
-    '管理员',
-    '001',
-    lastInsertRowid
-  );
+    'INSERT OR IGNORE INTO users (account, password, nickname, role_code, root_path) VALUES (?, ?, ?, ?, ?)'
+  ).run(useConfig().admin.account, createHash(useConfig().admin.password), '管理员', '001', '/');
 }

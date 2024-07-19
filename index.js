@@ -1,5 +1,5 @@
-const path = require('path');
-
-const str = path.join('/', '/yuwjoo', 'utils').replace(/\\/g, '/');
-
-console.log(str);
+try {
+  throw { code: 400, msg: '错误消息' };
+} catch (err) {
+  console.log(err.code, err.msg);
+}

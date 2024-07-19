@@ -5,7 +5,7 @@ export type RemoveFileRequestBody = void;
 
 // 删除文件接口-请求query
 export type RemoveFileRequestQuery = {
-  fileId: DirectorysTable['id']; // 文件id
+  filePath: DirectorysTable['path']; // 文件路径
 };
 
 // 删除文件接口-响应body

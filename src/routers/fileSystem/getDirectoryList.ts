@@ -4,9 +4,27 @@ import type {
   GetDirectoryListRequestQuery,
   GetDirectoryListResponseBody
 } from 'types/src/routers/fileSystem/getDirectoryList';
-import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
+import { defineResponseBody, defineRoute } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
-import { mergePath } from '@/utils/utils';
+import { joinPath } from '@/utils/utils';
+import { useAdmin } from '@/utils/oss';
+// import singV4 from '@/utils/signV4';
+
+// console.log(singV4("get", 900, {headers: "host": }))
+// http://yuwjoo-private-cloud-storage.oss-cn-shenzhen.aliyuncs.com/storage/yuwjoo/2024-07-18/10H59M37S/1721271617220-%E7%BB%98%E5%9B%BE2.jpg
+
+// console.log(
+//   useAdmin().signatureUrlV4(
+//     'POST',
+//     600,
+//     {
+//       queries: {
+//         uploads: null
+//       }
+//     },
+//     'storage/yuwjoo/2024-06-25/15H49M27S/example1.txt'
+//   )
+// );
 
 /**
  * @description: 获取目录列表接口
@@ -18,119 +36,40 @@ export default defineRoute({
     res: RouteResponse<GetDirectoryListResponseBody>
   ) => {
     const { query, locals } = req;
+    const folderPath = query.folderPath || '/';
+    const innerFolderPath = joinPath(locals.user.root_path, folderPath);
+    const directoryRows = selectDirectorys({ path: innerFolderPath });
+    const list = directoryRows.map((directory) => ({
+      ...directory,
+      fullPath: joinPath(folderPath, directory.name),
+      cover: createCoverUrl(directory.cover),
+      createTime: new Date(directory.create_date).getTime(),
+      modifiedTime: new Date(directory.modified_date).getTime()
+    }));
 
-    const rootFolderRow = selectFolderById(locals.user.root_folder_id);
-    let parentFolderRow;
-
-    if (query.parentFolderId) {
-      parentFolderRow = selectFolderById(query.parentFolderId);
-    } else {
-      parentFolderRow = rootFolderRow;
-    }
-
-    if (!rootFolderRow || !parentFolderRow) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '文件夹不存在' }));
-      return;
-    }
-
-    const rootFolderPath = mergePath(rootFolderRow.parent_path, rootFolderRow.name);
-    const parentFolderPath = mergePath(parentFolderRow.parent_path, parentFolderRow.name);
-
-    if (!parentFolderPath.startsWith(rootFolderPath)) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
-      return;
-    }
-
-    const folderPathList = selectFolderPathList(rootFolderPath, parentFolderPath);
-
-    const directoryRows = selectDirectorys({ parent_path: parentFolderPath });
-
-    let folderList: Required<GetDirectoryListResponseBody>['data']['directoryList'] = [];
-    let fileList: Required<GetDirectoryListResponseBody>['data']['directoryList'] = [];
-
-    directoryRows.forEach((directory) => {
-      const temp = {
-        id: directory.id,
-        name: directory.name,
-        size: directory.size,
-        type: directory.type,
-        mimeType: directory.mime_type,
-        parentFolderId: parentFolderRow.id,
-        createTime: new Date(directory.create_date).getTime(),
-        modifiedTime: new Date(directory.modified_date).getTime()
-      };
-      directory.type === 'folder' ? folderList.push(temp) : fileList.push(temp);
-    });
-
-    res.json(
-      defineResponseBody({
-        data: {
-          folderPathList,
-          directoryList: folderList.concat(fileList)
-        }
-      })
-    );
+    res.json(defineResponseBody({ data: { folderPath, list } }));
   }
 });
 
 /**
- * @description: 根据id查询文件夹
- */
-function selectFolderById(
-  params: DirectorysTable['id']
-): Pick<DirectorysTable, 'id' | 'parent_path' | 'name'> | undefined {
-  const sql = `SELECT id, parent_path, name FROM directorys WHERE type = 'folder' AND id = ?;`;
-  return useDatabase().prepare<typeof params, ReturnType<typeof selectFolderById>>(sql).get(params);
-}
-
-/**
- * @description: 查询文件夹路径列表
- */
-function selectFolderPathList(
-  rootPath: string,
-  folderPath: string
-): Required<GetDirectoryListResponseBody>['data']['folderPathList'] {
-  let sqlWhereParams = [];
-  let sqlWhereTexts = [];
-  let whileCount = 0;
-
-  do {
-    const pos = folderPath.lastIndexOf('/');
-    const parentPath = folderPath.slice(0, pos);
-    const folderName = folderPath.slice(pos + 1);
-    sqlWhereParams.push(parentPath || '/', folderName || '/');
-    sqlWhereTexts.push(`(parent_path = ? AND name = ?)`);
-    folderPath = parentPath;
-    if (++whileCount > 500) throw new Error('查询文件夹路径循环体异常, folderPath: ' + folderPath);
-  } while (folderPath && folderPath.startsWith(rootPath));
-
-  const sql = `
-    SELECT
-      id, parent_path, name
-    FROM
-      directorys
-    WHERE
-      type = 'folder' AND ${sqlWhereTexts.join(' OR ')}
-  `;
-  const folderRows = useDatabase()
-    .prepare<string[], Pick<DirectorysTable, 'id' | 'parent_path' | 'name'>>(sql)
-    .all(...sqlWhereParams);
-
-  return (folderRows || []).map((row, index) => ({
-    folderId: row.id,
-    folderName: index === 0 ? '/' : row.name
-  }));
-}
-
-/**
  * @description: 查询目录列表
  */
-function selectDirectorys(params: Pick<DirectorysTable, 'parent_path'>) {
-  type SQLResult = Pick<
-    DirectorysTable,
-    'id' | 'name' | 'size' | 'type' | 'mime_type' | 'create_date' | 'modified_date'
-  >;
+function selectDirectorys(
+  params: Pick<DirectorysTable, 'path'>
+): Pick<DirectorysTable, 'name' | 'size' | 'type' | 'cover' | 'create_date' | 'modified_date'>[] {
+  const sql = `SELECT name, size, type, cover, create_date, modified_date FROM directorys WHERE path = $path ORDER BY type DESC, name ASC;`;
+  return useDatabase().prepare<typeof params>(sql).all(params) as any;
+}
 
-  const sql = `SELECT id, name, size, type, mime_type, create_date, modified_date FROM directorys WHERE parent_path = $parent_path ORDER BY name ASC;`;
-  return useDatabase().prepare<typeof params, SQLResult>(sql).all(params);
+/**
+ * @description: 创建封面url
+ * @param {string} path 路径
+ * @return {string} 封面url
+ */
+function createCoverUrl(path: string): string {
+  if (path.startsWith('/static/cover')) {
+    return `http://14.103.48.37${path}`;
+  } else {
+    return useAdmin().signatureUrl(path, { expires: 60, process: 'image/resize,w_80' });
+  }
 }

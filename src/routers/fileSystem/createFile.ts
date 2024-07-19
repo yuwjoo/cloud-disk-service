@@ -9,7 +9,8 @@ import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import { decrypt } from '@/utils/secure';
 import { testFilename } from '@/utils/rules';
-import { mergePath } from '@/utils/utils';
+import { joinPath } from '@/utils/utils';
+import { useAdmin } from '@/utils/oss';
 
 /**
  * @description: 创建文件接口
@@ -20,127 +21,93 @@ export default defineRoute({
     req: RouteRequest<CreateFileRequestBody, CreateFileRequestQuery>,
     res: RouteResponse<CreateFileResponseBody>
   ) => {
-    const { query, locals } = req;
+    const { body, locals } = req;
 
-    if (!query.filename || !query.resourceFlag) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
-      return;
+    if (
+      !body.fileHash ||
+      !body.fileSize ||
+      !body.fileName ||
+      !body.folderPath ||
+      !body.uploadMode
+    ) {
+      throw { code: responseCode.error, msg: '缺少参数' };
     }
 
-    if (!testFilename(query.filename)) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '文件名不合法' }));
-      return;
+    if (!testFilename(body.fileName)) {
+      throw { code: responseCode.error, msg: '文件名不合法' };
     }
 
-    const rootFolderRow = selectFolderById(locals.user.root_folder_id);
-    let parentFolderRow;
+    const innerFolderPath = joinPath(locals.user.root_path, body.folderPath);
+    const resource = selectResource({ hash: body.fileHash, size: body.fileSize });
 
-    if (query.parentFolderId) {
-      parentFolderRow = selectFolderById(query.parentFolderId);
-    } else {
-      parentFolderRow = rootFolderRow;
-    }
+    if (resource) {
+      const cover = getFileCover(body.fileName, resource.object);
 
-    if (!rootFolderRow || !parentFolderRow) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '文件夹不存在' }));
-      return;
-    }
+      let fileName = body.fileName;
 
-    const rootFolderPath = mergePath(rootFolderRow.parent_path, rootFolderRow.name);
-    const parentFolderPath = mergePath(parentFolderRow.parent_path, parentFolderRow.name);
-
-    if (!parentFolderPath.startsWith(rootFolderPath)) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '无权限访问' }));
-      return;
-    }
-
-    let resourceFlag: ResourceFlagPayload | undefined; // 资源标识数据
-
-    try {
-      const data = JSON.parse(decrypt(query.resourceFlag));
-      if (data.token === locals.token) resourceFlag = data;
-    } catch (err) {}
-
-    if (!resourceFlag) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '资源标识已失效' }));
-      return;
-    }
-
-    const resource = selectResource(resourceFlag.resourceId);
-
-    if (!resource) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '资源不存在' }));
-      return;
-    }
-
-    let filename = query.filename;
-
-    if (selectFile({ parent_path: parentFolderPath, name: filename })) {
-      // 文件名重复，追加时间戳文本
-      let pos = filename.lastIndexOf('.');
-      if (pos === -1) {
-        filename = `${filename}_${Date.now()}`;
-      } else {
-        filename = `${filename.slice(0, pos)}_${Date.now()}${filename.slice(pos)}`;
+      if (selectFile({ path: innerFolderPath, name: fileName })) {
+        // 文件名重复，追加时间戳文本
+        let pos = fileName.lastIndexOf('.');
+        if (pos === -1) {
+          fileName = `${fileName}_${Date.now()}`;
+        } else {
+          fileName = `${fileName.slice(0, pos)}_${Date.now()}${fileName.slice(pos)}`;
+        }
       }
+
+      let fileData: Required<CreateFileResponseBody>['data']['file'];
+
+      useDatabase().transaction(() => {
+        createFile({
+          path: innerFolderPath,
+          name: fileName,
+          size: resource.size,
+          cover,
+          resources_id: resource.id
+        });
+
+        addResourcReferenceCounte(resource.id);
+
+        fileData = {
+          fullPath: joinPath(body.folderPath, fileName),
+          name: fileName,
+          size: resource.size,
+          type: 'file',
+          cover: createCoverUrl(cover),
+          createTime: (Date.now() / 1000) * 1000,
+          modifiedTime: (Date.now() / 1000) * 1000
+        };
+      })();
+
+      res.json(
+        defineResponseBody({
+          data: { folderPath: body.folderPath, file: fileData! },
+          msg: '创建成功'
+        })
+      );
+    } else {
+      useAdmin().initMultipartUpload();
     }
-
-    let fileData: CreateFileResponseBody['data'] | undefined;
-
-    useDatabase().transaction(() => {
-      const { lastInsertRowid } = createFile({
-        parent_path: parentFolderPath,
-        name: filename,
-        size: resource.size,
-        mime_type: resource.mime_type,
-        resources_id: resource.id,
-        create_account: locals.user.account
-      });
-      addResourcReferenceCounte(resource.id);
-
-      fileData = {
-        id: lastInsertRowid as number,
-        name: filename,
-        size: resource.size,
-        type: 'file',
-        mimeType: resource.mime_type,
-        parentFolderId: parentFolderRow.id,
-        createTime: (Date.now() / 1000) * 1000,
-        modifiedTime: (Date.now() / 1000) * 1000
-      };
-    })();
-
-    res.json(defineResponseBody({ data: fileData, msg: '创建成功' }));
   }
 });
 
 /**
- * @description: 根据id查询文件夹
- */
-function selectFolderById(
-  params: DirectorysTable['id']
-): Pick<DirectorysTable, 'id' | 'parent_path' | 'name'> | undefined {
-  const sql = `SELECT id, parent_path, name FROM directorys WHERE type = 'folder' AND id = ?;`;
-  return useDatabase().prepare<typeof params, ReturnType<typeof selectFolderById>>(sql).get(params);
-}
-
-/**
  * @description: 查询资源
  */
-function selectResource(
-  params: ResourcesTable['id']
-): Pick<ResourcesTable, 'id' | 'size' | 'mime_type'> | undefined {
-  const sql = `SELECT id, size, mime_type FROM resources WHERE id = ?;`;
-  return useDatabase().prepare<typeof params, ReturnType<typeof selectResource>>(sql).get(params);
+function selectResource(params: Pick<ResourcesTable, 'hash' | 'size'>) {
+  type SQLResult = Pick<ResourcesTable, 'id' | 'size' | 'object'>;
+
+  const sql = `SELECT id, size, object FROM resources WHERE hash = $hash AND size = $size;`;
+  return useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
 }
 
 /**
  * @description: 查询文件
  */
 function selectFile(
-  params: Pick<DirectorysTable, 'parent_path' | 'name'>
+  params: Pick<DirectorysTable, 'path' | 'name'>
 ): Pick<DirectorysTable, 'id'> | undefined {
-  const sql = `SELECT id FROM directorys WHERE type = 'file' AND parent_path = $parent_path AND name = $name;`;
+  const sql = `SELECT id FROM directorys WHERE type = 'file' AND path = $path AND name = $name;`;
   return useDatabase().prepare<typeof params, ReturnType<typeof selectFile>>(sql).get(params);
 }
 
@@ -148,12 +115,9 @@ function selectFile(
  * @description: 创建文件
  */
 function createFile(
-  params: Pick<
-    DirectorysTable,
-    'parent_path' | 'name' | 'size' | 'mime_type' | 'resources_id' | 'create_account'
-  >
+  params: Pick<DirectorysTable, 'path' | 'name' | 'size' | 'cover' | 'resources_id'>
 ) {
-  const sql = `INSERT INTO directorys (parent_path, name, size, type, mime_type, resources_id, create_account) VALUES ($parent_path, $name, $size, 'file', $mime_type, $resources_id, $create_account);`;
+  const sql = `INSERT INTO directorys (path, name, size, type, cover, resources_id) VALUES ($path, $name, $size, 'file', $cover, $resources_id);`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }
 
@@ -163,4 +127,50 @@ function createFile(
 function addResourcReferenceCounte(params: ResourcesTable['id']) {
   const sql = `UPDATE resources SET reference_count = reference_count + 1, modified_date = datetime (CURRENT_TIMESTAMP, 'localtime') WHERE id = ?;`;
   return useDatabase().prepare<typeof params>(sql).run(params);
+}
+
+/**
+ * @description: 获取文件封面
+ * @param {string} name 文件名称
+ * @param {string} object oss object
+ * @return {string} 封面地址
+ */
+function getFileCover(name: string, object: string): string {
+  const suffix = name.match(/\.(\w+)$/)?.[1].toLocaleLowerCase();
+
+  switch (suffix) {
+    case 'jpg':
+    case 'jpeg':
+    case 'png':
+    case 'gif':
+    case 'bmp':
+      return object;
+    case 'zip':
+    case 'rar':
+    case '7z':
+    case 'tar':
+    case 'gz':
+    case 'bz2':
+    case 'iso':
+      return '/static/cover/compressedFile.png';
+    case 'exe':
+      return '/static/cover/executionFile.png';
+    case 'pdf':
+      return '/static/cover/pdfFile.png';
+    default:
+      return '/static/cover/docmentFile.png';
+  }
+}
+
+/**
+ * @description: 创建封面url
+ * @param {string} path 路径
+ * @return {string} 封面url
+ */
+function createCoverUrl(path: string): string {
+  if (path.startsWith('/static/cover')) {
+    return `http://14.103.48.37${path}`;
+  } else {
+    return useAdmin().signatureUrl(path, { expires: 60 });
+  }
 }

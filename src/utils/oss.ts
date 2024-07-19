@@ -29,7 +29,9 @@ export function useAdmin(): OSS {
     region: 'oss-cn-shenzhen',
     accessKeyId: useConfig().oss.adminAccessKeyID,
     accessKeySecret: useConfig().oss.adminAccessKeySecret,
-    bucket: useConfig().oss.bucketName
+    bucket: useConfig().oss.bucketName,
+    // @ts-ignore
+    authorizationV4: true
   });
   return admin;
 }

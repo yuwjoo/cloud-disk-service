@@ -61,6 +61,12 @@ export function splitPath(path: string): string[] {
  * @param {string[]} args 路径参数
  * @return {string} 路径字符串
  */
-export function mergePath(...args: string[]): string {
-  return path.join(...args).replace(/\\/g, '/');
+export function joinPath(...args: string[]): string {
+  let arr = [];
+
+  for (let path of args) {
+    arr.push(...path.split('/').filter(Boolean));
+  }
+
+  return '/' + arr.join('/');
 }

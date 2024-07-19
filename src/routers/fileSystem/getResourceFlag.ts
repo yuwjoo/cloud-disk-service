@@ -21,8 +21,7 @@ export default defineRoute({
     const { query, locals } = req;
 
     if (!query.fileHash || query.fileSize === undefined) {
-      res.json(defineResponseBody({ code: responseCode.error, msg: '缺少参数' }));
-      return;
+      throw { code: responseCode.error, msg: '缺少参数' };
     }
 
     const resourceRow = selectResource({ hash: query.fileHash, size: query.fileSize });

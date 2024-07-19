@@ -8,6 +8,7 @@ import { useDatabase } from '@/utils/database';
 import { createHash } from '@/utils/secure';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { testFilename } from '@/utils/rules';
+import { joinPath } from '@/utils/utils';
 
 /**
  * @description: 注册接口
@@ -39,18 +40,18 @@ export default defineRoute({
     }
 
     useDatabase().transaction(() => {
-      const { lastInsertRowid } = createUserRootFolder({
-        parent_path: '/',
+      createUserRootFolder({
+        path: '/',
         name: body.account,
         type: 'folder',
-        create_account: body.account
+        cover: '/static/cover/folder'
       }); // 创建用户根文件夹
 
       createUser({
         nickname: body.nickname || body.account,
         account: body.account,
         password: createHash(body.password),
-        root_folder_id: lastInsertRowid as number
+        root_path: joinPath('/', body.account)
       }); // 创建用户
     })();
 
@@ -69,19 +70,15 @@ function selectUser(params: Pick<UsersTable, 'account'>): Pick<UsersTable, 'acco
 /**
  * @description: 创建用户根文件夹
  */
-function createUserRootFolder(
-  params: Pick<DirectorysTable, 'parent_path' | 'name' | 'type' | 'create_account'>
-) {
-  const sql = `INSERT INTO directorys (parent_path, name, type, create_account) VALUES ($parent_path, $name, $type, $create_account)`;
+function createUserRootFolder(params: Pick<DirectorysTable, 'path' | 'name' | 'type' | 'cover'>) {
+  const sql = `INSERT INTO directorys (path, name, type, cover) VALUES ($path, $name, $type, $cover)`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }
 
 /**
  * @description: 创建用户
  */
-function createUser(
-  params: Pick<UsersTable, 'nickname' | 'account' | 'password' | 'root_folder_id'>
-) {
-  const sql = `INSERT INTO users (nickname, account, password, root_folder_id) VALUES ( $nickname, $account, $password, $root_folder_id );`;
+function createUser(params: Pick<UsersTable, 'nickname' | 'account' | 'password' | 'root_path'>) {
+  const sql = `INSERT INTO users (nickname, account, password, root_path) VALUES ( $nickname, $account, $password, $root_path );`;
   return useDatabase().prepare<typeof params>(sql).run(params);
 }

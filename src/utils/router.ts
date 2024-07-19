@@ -55,10 +55,14 @@ export function defineRoute(config: DefineRouteConfig): DefineRouteReturn {
   ) => {
     try {
       await config.handler(req, res, next);
-    } catch (err) {
-      error('API名称: ', req.url);
-      error('API报错: ', err);
-      res.json(defineResponseBody({ code: responseCode.serverError, msg: '服务器内部错误' }));
+    } catch (err: any) {
+      if (typeof err === 'object' && err.code && err.msg) {
+        res.json(defineResponseBody({ code: err.code, msg: err.msg }));
+      } else {
+        error('API名称: ', req.url);
+        error('API报错: ', err);
+        res.json(defineResponseBody({ code: responseCode.serverError, msg: '服务器内部错误' }));
+      }
     }
   };
 
