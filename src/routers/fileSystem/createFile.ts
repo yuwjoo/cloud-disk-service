@@ -16,44 +16,23 @@ import { useAdmin } from '@/utils/oss';
  * @description: 创建文件接口
  */
 export default defineRoute({
-  method: 'get',
+  method: 'post',
   handler: async (
     req: RouteRequest<CreateFileRequestBody, CreateFileRequestQuery>,
     res: RouteResponse<CreateFileResponseBody>
   ) => {
     const { body, locals } = req;
 
-    if (
-      !body.fileHash ||
-      !body.fileSize ||
-      !body.fileName ||
-      !body.folderPath ||
-      !body.uploadMode
-    ) {
-      throw { code: responseCode.error, msg: '缺少参数' };
-    }
-
-    if (!testFilename(body.fileName)) {
-      throw { code: responseCode.error, msg: '文件名不合法' };
-    }
+    checkParams(body);
 
     const innerFolderPath = joinPath(locals.user.root_path, body.folderPath);
-    const resource = selectResource({ hash: body.fileHash, size: body.fileSize });
+    const resource = body.forceUpload
+      ? null
+      : selectResource({ hash: body.fileHash, size: body.fileSize });
 
     if (resource) {
       const cover = getFileCover(body.fileName, resource.object);
-
-      let fileName = body.fileName;
-
-      if (selectFile({ path: innerFolderPath, name: fileName })) {
-        // 文件名重复，追加时间戳文本
-        let pos = fileName.lastIndexOf('.');
-        if (pos === -1) {
-          fileName = `${fileName}_${Date.now()}`;
-        } else {
-          fileName = `${fileName.slice(0, pos)}_${Date.now()}${fileName.slice(pos)}`;
-        }
-      }
+      const fileName = getFileName(innerFolderPath, body.fileName);
 
       let fileData: Required<CreateFileResponseBody>['data']['file'];
 
@@ -81,15 +60,70 @@ export default defineRoute({
 
       res.json(
         defineResponseBody({
-          data: { folderPath: body.folderPath, file: fileData! },
+          data: { isComplete: true, folderPath: body.folderPath, file: fileData },
           msg: '创建成功'
         })
       );
     } else {
-      useAdmin().initMultipartUpload();
+      const partSize = Math.max(1 * 1024 * 1024, body.partSize || 0);
+      const result = await useAdmin().initMultipartUpload(
+        `storage/${locals.user.account}/${body.fileHash}-${Date.now()}-${body.fileName}`
+      );
+
+      let uploadUrls: string[] = [];
+      for (let i = 1; i <= Math.ceil(body.fileSize / partSize); i++) {
+        uploadUrls.push(
+          // @ts-ignore
+          await useAdmin().signatureUrlV4(
+            'PUT',
+            1 * 60 * 60,
+            {
+              headers: {
+                'Content-Type': 'application/octet-stream'
+              },
+              queries: {
+                partNumber: i,
+                uploadId: result.uploadId
+              }
+            },
+            result.name
+          )
+        );
+      }
+      uploadUrls.push(
+        // @ts-ignore
+        await useAdmin().signatureUrlV4(
+          'POST',
+          1 * 60 * 60,
+          {
+            headers: {},
+            queries: {
+              uploadId: result.uploadId
+            }
+          },
+          result.name
+        )
+      );
+      res.json(
+        defineResponseBody({ data: { isComplete: false, folderPath: body.folderPath, uploadUrls } })
+      );
     }
   }
 });
+
+/**
+ * @description: 检查参数
+ * @param {CreateFileRequestBody} body body
+ */
+function checkParams(body: CreateFileRequestBody) {
+  if (!body.fileHash || !body.fileSize || !body.fileName || !body.folderPath || !body.uploadMode) {
+    throw { code: responseCode.error, msg: '缺少参数' };
+  }
+
+  if (!testFilename(body.fileName)) {
+    throw { code: responseCode.error, msg: '文件名不合法' };
+  }
+}
 
 /**
  * @description: 查询资源
@@ -99,16 +133,6 @@ function selectResource(params: Pick<ResourcesTable, 'hash' | 'size'>) {
 
   const sql = `SELECT id, size, object FROM resources WHERE hash = $hash AND size = $size;`;
   return useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
-}
-
-/**
- * @description: 查询文件
- */
-function selectFile(
-  params: Pick<DirectorysTable, 'path' | 'name'>
-): Pick<DirectorysTable, 'id'> | undefined {
-  const sql = `SELECT id FROM directorys WHERE type = 'file' AND path = $path AND name = $name;`;
-  return useDatabase().prepare<typeof params, ReturnType<typeof selectFile>>(sql).get(params);
 }
 
 /**
@@ -160,6 +184,30 @@ function getFileCover(name: string, object: string): string {
     default:
       return '/static/cover/docmentFile.png';
   }
+}
+
+/**
+ * @description: 获取文件名称
+ * @param {string} path 路径
+ * @param {string} name 名称
+ * @return {string} 文件名称
+ */
+function getFileName(path: string, name: string): string {
+  const sql = `SELECT id FROM directorys WHERE type = 'file' AND path = $path AND name = $name;`;
+  const isExist = useDatabase()
+    .prepare<Pick<DirectorysTable, 'path' | 'name'>, Pick<DirectorysTable, 'id'>>(sql)
+    .get({ path, name });
+  const pos = name.lastIndexOf('.');
+
+  if (isExist) {
+    if (pos === -1) {
+      name = `${name}_${Date.now()}`;
+    } else {
+      name = `${name.slice(0, pos)}_${Date.now()}${name.slice(pos)}`;
+    }
+  }
+
+  return name;
 }
 
 /**
