@@ -15,6 +15,7 @@
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
+    "mime": "^4.0.4",
     "tinytime": "^0.2.6"
   },
   "devDependencies": {

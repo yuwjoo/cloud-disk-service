@@ -1,4 +1,7 @@
-import path from 'path';
+import tinytime from 'tinytime';
+import { useConfig } from './config';
+
+const dbTimeTemplate = tinytime('{YYYY}-{Mo}-{DD} {H}:{mm}:{ss}', { padMonth: true }); // 数据库时间格式化模板
 
 /**
  * @description: 对象转查询字符串
@@ -69,4 +72,22 @@ export function joinPath(...args: string[]): string {
   }
 
   return '/' + arr.join('/');
+}
+
+/**
+ * @description: 转化为数据库时间
+ * @param {string | number | Date} value 值
+ * @return {string} 日期字符串
+ */
+export function toDBDate(value: string | number | Date): string {
+  return dbTimeTemplate.render(new Date(value));
+}
+
+/**
+ * @description: 获取服务器url
+ * @return {string} 服务器url
+ */
+export function getServerUrl(): string {
+  const port = process.env.mode === 'development' ? 80 : useConfig().port;
+  return `${useConfig().protocol}://${useConfig().host}:${port}`;
 }

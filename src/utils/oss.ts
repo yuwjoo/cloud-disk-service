@@ -1,8 +1,9 @@
 import OSS, { STS } from 'ali-oss';
 import { useConfig } from './config';
+import type { OSSIns } from 'types/src/utils/oss';
 
 let sts: STS; // sts对象
-let admin: OSS; // admin对象
+let admin: OSSIns; // admin对象
 
 /**
  * @description: 使用sts
@@ -22,16 +23,14 @@ export function useSTS(): STS {
  * @description: 使用admin
  * @return {OSS} admin
  */
-export function useAdmin(): OSS {
+export function useAdmin(): OSSIns {
   if (admin) return admin;
 
   admin = new OSS({
     region: 'oss-cn-shenzhen',
     accessKeyId: useConfig().oss.adminAccessKeyID,
     accessKeySecret: useConfig().oss.adminAccessKeySecret,
-    bucket: useConfig().oss.bucketName,
-    // @ts-ignore
-    authorizationV4: true
-  });
+    bucket: useConfig().oss.bucketName
+  }) as any;
   return admin;
 }

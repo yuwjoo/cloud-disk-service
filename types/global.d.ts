@@ -1,10 +1,13 @@
 import type { responseCode } from '@/utils/router';
+import type OSS from 'ali-oss';
 import type { Request, Response } from 'express';
 import type { UsersTable } from 'types/src/utils/database';
 
 declare global {
   interface Config {
     platform: 'win' | 'linux'; // 运行平台
+    protocol: string; // 协议
+    host: string; // 服务器host
     port: number; // 监听端口
     tempTokenExpirationTime: number; // 临时token过期时间（单位：秒）
     tokenExpirationTime: number; // 长期token过期时间（单位：秒）
