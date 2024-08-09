@@ -262,7 +262,7 @@ function getUrlCallback(fileHash: string, token: string): Record<string, any> {
   return {
     callback: btoa(
       JSON.stringify({
-        callbackUrl: `${getServerUrl}/oss/uploadCallback`,
+        callbackUrl: `${getServerUrl()}/oss/uploadCallback`,
         callbackBody:
           'object=${object}&size=${size}&clientIp=${clientIp}&hash=${x:hash}&token=${x:token}',
         callbackBodyType: 'application/x-www-form-urlencoded'
