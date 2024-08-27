@@ -1,10 +1,10 @@
 import type { ResourcesTable } from 'types/src/utils/database';
 import type {
-  GetResourceFlagRequestBody,
-  GetResourceFlagRequestQuery,
-  GetResourceFlagResponseBody,
+  GetResourceTokenRequestBody,
+  GetResourceTokenRequestQuery,
+  GetResourceTokenResponseBody,
   ResourceFlagPayload
-} from 'types/src/routers/fileSystem/getResourceFlag';
+} from 'types/src/routers/fileSystem/getResourceToken';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import { encrypt } from '@/utils/secure';
@@ -15,16 +15,16 @@ import { encrypt } from '@/utils/secure';
 export default defineRoute({
   method: 'get',
   handler: async (
-    req: RouteRequest<GetResourceFlagRequestBody, GetResourceFlagRequestQuery>,
-    res: RouteResponse<GetResourceFlagResponseBody>
+    req: RouteRequest<GetResourceTokenRequestBody, GetResourceTokenRequestQuery>,
+    res: RouteResponse<GetResourceTokenResponseBody>
   ) => {
     const { query, locals } = req;
 
-    if (!query.fileHash || query.fileSize === undefined) {
+    if (!query.fileHash) {
       throw { code: responseCode.error, msg: '缺少参数' };
     }
 
-    const resourceRow = selectResource({ hash: query.fileHash, size: query.fileSize });
+    const resourceRow = selectResource({ hash: query.fileHash });
 
     const flag: ResourceFlagPayload = {
       token: locals.token,
@@ -39,9 +39,9 @@ export default defineRoute({
 /**
  * @description: 查询资源
  */
-function selectResource(params: Pick<ResourcesTable, 'hash' | 'size'>) {
+function selectResource(params: Pick<ResourcesTable, 'hash'>) {
   type SQLResult = Pick<ResourcesTable, 'id'>;
 
-  const sql = `SELECT id FROM resources WHERE hash = $hash AND size = $size;`;
+  const sql = `SELECT id FROM resources WHERE hash = $hash;`;
   return useDatabase().prepare<typeof params, SQLResult>(sql).get(params);
 }
