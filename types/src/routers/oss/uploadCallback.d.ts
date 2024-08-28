@@ -11,6 +11,4 @@ export type UploadCallbackRequestBody = {
 export type UploadCallbackRequestQuery = void;
 
 // oss上传回调接口-响应body
-export type UploadCallbackResponseBody = ResponseBody<{
-  resourceFlag: string; // 资源标识
-}>;
+export type UploadCallbackResponseBody = ResponseBody<string>;

@@ -7,9 +7,10 @@ import type {
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { useDatabase } from '@/utils/database';
 import { testFilename } from '@/utils/rules';
-import { getServerUrl, joinPath, objectToQueryStr, toDBDate } from '@/utils/utils';
-import { useAdmin } from '@/utils/oss';
-import { generateCoverUrl, generateFileCover, generateOssObjectName } from '@/utils/file';
+import { joinPath, toDBDate } from '@/utils/utils';
+import { generateCoverUrl, generateFileCover } from '@/utils/file';
+import { decrypt } from '@/utils/secure';
+import type { ResourceFlagPayload } from 'types/src/routers/fileSystem/getResourceToken';
 
 /**
  * @description: 创建文件接口
@@ -21,44 +22,11 @@ export default defineRoute({
     res: RouteResponse<CreateFileResponseBody>
   ) => {
     const params = handleParams(req.body);
-    const resourceRow = params.forceUpload ? undefined : findResource(params);
-    let file: Required<CreateFileResponseBody>['data']['file'];
-    let upload: Required<CreateFileResponseBody>['data']['upload'] = {};
+    const resourceToken = JSON.parse(decrypt(params.resourceToken)) as ResourceFlagPayload;
+    const resourceRow = findResource(resourceToken);
+    const file = createFile(params, req.locals, resourceRow!);
 
-    if (resourceRow) {
-      file = createFile(params, req.locals, resourceRow);
-    } else if (params.uploadMode === 'simple') {
-      upload = {
-        mode: 'simple',
-        simpleUrl: await generateSimpleUrl(
-          params.fileHash,
-          params.fileName,
-          params.mimeType,
-          req.locals.user.account,
-          req.locals.token
-        )
-      };
-    } else {
-      const { uploadId, name } = await useAdmin().initMultipartUpload(
-        generateOssObjectName(req.locals.user.account, params.fileHash, params.fileName)
-      ); // 初始化分片上传
-      upload = {
-        mode: 'multipart',
-        ...(await generateMultiPartUrl(
-          uploadId,
-          1,
-          name,
-          params.partSize || 0,
-          params.fileSize,
-          params.fileHash,
-          params.fileName,
-          params.mimeType,
-          req.locals.token
-        ))
-      };
-    }
-
-    res.json(defineResponseBody({ data: { folderPath: params.folderPath, file, upload } }));
+    res.json(defineResponseBody({ data: { folderPath: params.folderPath, file } }));
   }
 });
 
@@ -68,14 +36,7 @@ export default defineRoute({
  * @return {CreateFileRequestBody} 处理后的参数
  */
 function handleParams(body: CreateFileRequestBody): CreateFileRequestBody {
-  if (
-    !body.fileHash ||
-    body.fileSize === undefined ||
-    !body.fileName ||
-    !body.folderPath ||
-    !body.uploadMode ||
-    !body.mimeType
-  ) {
+  if (!body.folderPath || !body.fileName || !body.resourceToken) {
     throw { code: responseCode.error, msg: '缺少参数' };
   }
 
@@ -88,25 +49,24 @@ function handleParams(body: CreateFileRequestBody): CreateFileRequestBody {
 
 /**
  * @description: 寻找资源
- * @param {CreateFileRequestBody} params 参数
+ * @param {ResourceFlagPayload} params 参数
  * @return {Pick<ResourcesTable, 'id' | 'size' | 'object'> | undefined} 查询结果
  */
 function findResource(
-  params: CreateFileRequestBody
+  params: ResourceFlagPayload
 ): Pick<ResourcesTable, 'id' | 'size' | 'object'> | undefined {
   return useDatabase()
     .prepare<
-      Pick<ResourcesTable, 'hash' | 'size'>,
+      Pick<ResourcesTable, 'id'>,
       Pick<ResourcesTable, 'id' | 'size' | 'object'> | undefined
     >(
       `
         SELECT id, size, object 
         FROM resources 
-        WHERE hash = $hash 
-        AND size = $size;
+        WHERE id = $id;
       `
     )
-    .get({ hash: params.fileHash, size: params.fileSize });
+    .get({ id: params.resourceId });
 }
 
 /**
@@ -134,146 +94,6 @@ function createFile(
     cover: generateCoverUrl(fileRow.cover),
     createTime: new Date(fileRow.create_date).getTime(),
     modifiedTime: new Date(fileRow.modified_date).getTime()
-  };
-}
-
-/**
- * @description: 生成简单上传url
- * @param {string} fileHash 文件哈希
- * @param {string} fileName 文件名
- * @param {string} mimeType 文件类型
- * @param {string} account 账号
- * @param {string} token 签名token
- * @return {Promise<string>} 上传url
- */
-async function generateSimpleUrl(
-  fileHash: string,
-  fileName: string,
-  mimeType: string,
-  account: string,
-  token: string
-): Promise<string> {
-  const expire = 1 * 60 * 60 * 3; // 过期时间
-  return await useAdmin().signatureUrlV4(
-    'PUT',
-    expire,
-    {
-      headers: {
-        'Content-Type': mimeType,
-        'x-oss-forbid-overwrite': true,
-        'x-oss-object-acl': 'private',
-        'x-oss-storage-class': 'Standard'
-      },
-      queries: getUrlCallback(fileHash, token)
-    },
-    generateOssObjectName(account, fileHash, fileName)
-  );
-}
-
-/**
- * @description: 生成分片上传url
- * @param {string} uploadId 分片id
- * @param {number} startPartNumber 起始分片序号
- * @param {string} object object名称
- * @param {number} partSize 分片大小，单位为KB，默认为1MB，minimum为100KB
- * @param {number} fileSize 文件大小
- * @param {string} fileHash 文件hash
- * @param {string} fileName 文件名
- * @param {string} mimeType 文件类型
- * @param {string} token 签名token
- * @returns {Promise<{ partSize: number; startPartNumber: number; multipartUrls: string[]; nextMultipartUrl?: string; submitMultiPartUrl?: string }>} 分片上传数据
- */
-async function generateMultiPartUrl(
-  uploadId: string,
-  startPartNumber: number,
-  object: string,
-  partSize: number,
-  fileSize: number,
-  fileHash: string,
-  fileName: string,
-  mimeType: string,
-  token: string
-): Promise<{
-  partSize: number;
-  startPartNumber: number;
-  multipartUrls: string[];
-  nextMultipartUrl?: string;
-  submitMultiPartUrl?: string;
-}> {
-  const expire = 1 * 60 * 60 * 3; // 过期时间
-  const size = Math.max(1 * 1024 * 100, partSize || 1 * 1024 * 1024); // 分片大小默认1MB，最小100KB
-  const count = Math.ceil(fileSize / size); // 分片总数
-  const forCount = Math.min(100, count - startPartNumber + 1); // 循环次数，最多100次
-
-  const multipartUrls = Array.from({ length: forCount }).map((_, i) => {
-    return useAdmin().signatureUrlV4(
-      'PUT',
-      expire,
-      {
-        headers: { 'Content-Type': mimeType },
-        queries: { partNumber: startPartNumber + i, uploadId }
-      },
-      object
-    );
-  }); // 生成分片上传url
-
-  if (startPartNumber - 1 + forCount < count) {
-    const nextUrlQuery = objectToQueryStr({
-      uploadId,
-      startPartNumber: startPartNumber + forCount,
-      partSize: size,
-      fileHash,
-      fileSize,
-      fileName,
-      mimeType
-    });
-    return {
-      partSize: size,
-      startPartNumber,
-      multipartUrls: await Promise.all(multipartUrls),
-      nextMultipartUrl: getServerUrl() + '/oss/getMultipart?' + nextUrlQuery
-    };
-  } else {
-    const submitMultiPartUrl = useAdmin().signatureUrlV4(
-      'POST',
-      expire,
-      {
-        headers: { 'x-oss-forbid-overwrite': true },
-        queries: { uploadId, ...getUrlCallback(fileHash, token) }
-      },
-      object
-    );
-    return {
-      partSize: size,
-      startPartNumber,
-      multipartUrls: await Promise.all(multipartUrls),
-      submitMultiPartUrl: await submitMultiPartUrl
-    };
-  }
-}
-
-/**
- * @description 生成url回调配置
- * @param {string} fileHash 文件hash
- * @param {string} token  用户token
- * @returns {Record<string, any>} 回调配置
- */
-function getUrlCallback(fileHash: string, token: string): Record<string, any> {
-  return {
-    callback: btoa(
-      JSON.stringify({
-        callbackUrl: `${getServerUrl()}/oss/uploadCallback`,
-        callbackBody:
-          'object=${object}&size=${size}&clientIp=${clientIp}&hash=${x:hash}&token=${x:token}',
-        callbackBodyType: 'application/x-www-form-urlencoded'
-      })
-    ),
-    'callback-var': btoa(
-      JSON.stringify({
-        'x:hash': fileHash,
-        'x:token': token
-      })
-    )
   };
 }
 

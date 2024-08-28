@@ -55,5 +55,5 @@ async function generateMultiPartUrl(
     },
     object
   );
-  return { number: partNumber, url, expire };
+  return { number: partNumber, url, expire: Date.now() + expire * 1000 };
 }

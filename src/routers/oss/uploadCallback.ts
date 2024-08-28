@@ -5,7 +5,7 @@ import type {
   UploadCallbackResponseBody
 } from 'types/src/routers/oss/uploadCallback';
 import type { NextFunction } from 'express';
-import type { ResourceFlagPayload } from 'types/src/routers/fileSystem/getResourceFlag';
+import type { ResourceFlagPayload } from 'types/src/routers/fileSystem/getResourceToken';
 import { useDatabase } from '@/utils/database';
 import { defineResponseBody, defineRoute, responseCode } from '@/utils/router';
 import { createVerify } from 'crypto';
@@ -39,9 +39,7 @@ export default defineRoute({
       resourceId: lastInsertRowid as number
     };
 
-    res.json(
-      defineResponseBody({ data: { resourceFlag: encrypt(JSON.stringify(flag)) }, msg: '上传成功' })
-    );
+    res.json(defineResponseBody({ data: encrypt(JSON.stringify(flag)), msg: '上传成功' }));
   }
 });
 

@@ -37,6 +37,6 @@ export default defineRoute({
       }
     );
 
-    res.json(defineResponseBody({ data: response.data as unknown as string }));
+    res.json(defineResponseBody({ data: (response.data as unknown as any).data }));
   }
 });
