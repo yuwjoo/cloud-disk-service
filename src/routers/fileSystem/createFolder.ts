@@ -31,7 +31,7 @@ export default defineRoute({
 
     const folderPath = query.folderPath || '/';
     const innerFolderPath = joinPath(locals.user.root_path, folderPath);
-    const cover = '/static/cover/folder.png';
+    const cover = 'localhost://folder.png';
 
     if (selectFolder({ path: innerFolderPath, name: query.name })) {
       throw { code: responseCode.error, msg: '文件夹名重复' };
@@ -52,7 +52,7 @@ export default defineRoute({
             name: query.name,
             size: 0,
             type: 'folder',
-            cover: createCoverUrl(cover),
+            cover,
             createTime: (Date.now() / 1000) * 1000,
             modifiedTime: (Date.now() / 1000) * 1000
           }
@@ -79,17 +79,4 @@ function selectFolder(
 function createFolder(params: Pick<DirectorysTable, 'path' | 'name' | 'cover'>) {
   const sql = `INSERT INTO directorys (path, name, type, cover) VALUES ($path, $name, 'folder', $cover);`;
   return useDatabase().prepare<typeof params>(sql).run(params);
-}
-
-/**
- * @description: 创建封面url
- * @param {string} path 路径
- * @return {string} 封面url
- */
-function createCoverUrl(path: string): string {
-  if (path.startsWith('/static/cover')) {
-    return `http://14.103.48.37${path}`;
-  } else {
-    return useAdmin().signatureUrl(path, { expires: 60 });
-  }
 }
